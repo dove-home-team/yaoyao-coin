@@ -1,6 +1,5 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
-import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
 import java.util.ArrayList;
@@ -17,25 +16,31 @@ public class LayoutManager {
 
     public LayoutManager() {
 
+
+    }
+
+    public void init() {
+        groups.clear();
+        slotIdToGroupIndex.clear();
+
         CoinSlotGroup defaultGroup = new CoinSlotGroup();
         groups.add(defaultGroup);
 
+        ClientCoinStorage storage = ClientCoinStorage.INSTANCE;
 
 
-        defaultGroup.addSlot(0, 0, new CoinSlot(0), false);
-        defaultGroup.addSlot(1, 0, new CoinSlot(1), false);
-        defaultGroup.addSlot(2, 0, new CoinSlot(2), false);
-        defaultGroup.addSlot(0, 1, new CoinSlot(3), false);
-        defaultGroup.addSlot(1, 1, new CoinSlot(4), false);
-        defaultGroup.addSlot(1, 2, new CoinSlot(5), false);
+        for (int i = 0; i < storage.getSlots().size(); i++) {
+            CoinSlot slot = storage.getSlots().get(i);
+            defaultGroup.addSlot(i, 0, slot, false);
+            slotIdToGroupIndex.put(i, 0);
+        }
 
         defaultGroup.setGroupX(50);
         defaultGroup.setGroupY(50);
 
-        for(int i = 0; i < 5; i++) {
+        for (int i = 0; i < 3; i++) {
             slotIdToGroupIndex.put(i, 0);
         }
-
     }
 
     public CoinSlotGroup getGroup(int slotId) {
@@ -50,11 +55,6 @@ public class LayoutManager {
     public List<CoinSlotGroup> getGroups() {
         return this.groups;
     }
-
-
-    private CoinSlotGroup draggingGroup = null;
-    private int draggingOffsetX = 0;
-    private int draggingOffsetY = 0;
 
 
 }

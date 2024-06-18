@@ -1,6 +1,7 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import org.apache.logging.log4j.util.TriConsumer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +27,9 @@ public class CoinSlotGroup {
         Empty
     }
 
+    public interface SlotConsumer {
+        void accept(int x, int y, CoinSlot slot, boolean borrowed);
+    }
     private final ArrayList<Entry> slots = new ArrayList<>();
 
     private final Int2IntOpenHashMap slotIdToIndex = new Int2IntOpenHashMap();
@@ -117,6 +121,14 @@ public class CoinSlotGroup {
             return -1;
         }
         return slots.get(slotIndex).gridY;
+    }
+
+    public void iterateSlots(SlotConsumer consumer) {
+        ClientCoinStorage storage = ClientCoinStorage.INSTANCE;
+        for (Entry entry : slots) {
+            CoinSlot slot = storage.getSlots().get(entry.slotId);
+            consumer.accept(entry.girdX, entry.gridY, slot, entry.isBorrowed);
+        }
     }
 
     public int getGroupX() {

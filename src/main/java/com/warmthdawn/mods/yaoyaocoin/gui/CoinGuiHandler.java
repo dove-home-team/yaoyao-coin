@@ -2,8 +2,13 @@ package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.warmthdawn.mods.yaoyaocoin.mixin.AbstractContainerScreenAccessor;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.entity.ItemRenderer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.event.ContainerScreenEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -15,13 +20,18 @@ public class CoinGuiHandler extends GuiComponent {
     public void initialize(IEventBus modEventBus) {
         modEventBus.addListener(this::onDrawBackground);
         modEventBus.addListener(this::onDrawForeground);
+        modEventBus.addListener(this::onInit);
 
 
     }
 
+    private static final int SLOT_COLOR = 0x80FFFFFF;
+
+
+
 
     public void onInit(ScreenEvent.InitScreenEvent.Post event) {
-
+        layoutManager.init();
     }
 
     public void onDrawBackground(ContainerScreenEvent.DrawBackground event) {
@@ -50,6 +60,88 @@ public class CoinGuiHandler extends GuiComponent {
 
     public void onDrawForeground(ContainerScreenEvent.DrawForeground event) {
 
+        int mouseX = event.getMouseX();
+        int mouseY = event.getMouseY();
+
+        AbstractContainerScreen<?> screen = event.getContainerScreen();
+
+        PoseStack renderPoseStack = RenderSystem.getModelViewStack();
+        renderPoseStack.pushPose();
+        renderPoseStack.translate(-screen.getGuiLeft(), -screen.getGuiTop(), 0);
+        RenderSystem.applyModelViewMatrix();
+
+        for(CoinSlotGroup group : layoutManager.getGroups()) {
+            int x0 = group.getGroupX();
+            int y0 = group.getGroupY();
+
+            event.getContainerScreen().setBlitOffset(100);
+            group.iterateSlots((gridX, gridY, slot, isBorrowed) -> {
+                // draw items
+                if (isBorrowed) {
+                    return;
+                }
+
+                RenderSystem.setShader(GameRenderer::getPositionTexShader);
+                drawSlotItem(event.getPoseStack(), x0, y0, gridX, gridY, slot);
+
+            });
+
+            event.getContainerScreen().setBlitOffset(0);
+
+        }
+
+        for(CoinSlotGroup group : layoutManager.getGroups()) {
+
+            int x0 = group.getGroupX();
+            int y0 = group.getGroupY();
+            group.iterateSlots((gridX, gridY, slot, isBorrowed) -> {
+                if(isBorrowed) {
+                    return;
+                }
+                if(isMouseOverSlot(mouseX, mouseY, x0, y0, gridX, gridY)) {
+                    AbstractContainerScreenAccessor accessor = (AbstractContainerScreenAccessor) screen;
+                    accessor.setHoveredSlot(null);
+
+                    int x = x0 + gridX * 20 + 2;
+                    int y = y0 + gridY * 20 + 2;
+                    AbstractContainerScreen.renderSlotHighlight(event.getPoseStack(), x, y, screen.getBlitOffset(), SLOT_COLOR);
+                }
+            });
+        }
+
+        renderPoseStack.popPose();
+        RenderSystem.applyModelViewMatrix();
+    }
+
+    private void drawSlotItem(PoseStack poseStack, int x, int y, ItemStack stack, int count) {
+        ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
+        Minecraft minecraft = Minecraft.getInstance();
+        itemRenderer.blitOffset = 100.0F;
+
+        RenderSystem.enableDepthTest();
+        itemRenderer.renderAndDecorateItem(stack, x, y);
+        itemRenderer.renderGuiItemDecorations(minecraft.font, stack, x, y, String.valueOf(count));
+
+        itemRenderer.blitOffset = 0.0F;
+
+    }
+
+    private void drawSlotItem(PoseStack poseStack, int x0, int y0, int gridX, int gridY, CoinSlot slot) {
+
+        int x = x0 + gridX * 20 + 2;
+        int y = y0 + gridY * 20 + 2;
+
+        ItemStack stack = slot.getStack();
+        int count = slot.getCount();
+
+        drawSlotItem(poseStack, x, y, stack, count);
+
+
+    }
+
+    private boolean isMouseOverSlot(int mouseX, int mouseY, int x0, int y0, int slotX, int slotY) {
+        return mouseX >= x0 + slotX * 20  + 2 && mouseX < x0 + slotX * 20 + 18 &&
+                mouseY >= y0 + slotY * 20 + 2 && mouseY < y0 + slotY * 20 + 18;
     }
 
     private void drawSlot(PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {

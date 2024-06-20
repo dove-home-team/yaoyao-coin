@@ -2,19 +2,25 @@ package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
 import com.warmthdawn.mods.yaoyaocoin.mixin.AbstractContainerScreenAccessor;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.event.ContainerScreenEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+
+import java.util.List;
 
 public class CoinGuiHandler extends GuiComponent {
 
@@ -118,26 +124,8 @@ public class CoinGuiHandler extends GuiComponent {
         renderPoseStack.translate(-screen.getGuiLeft(), -screen.getGuiTop(), 0);
         RenderSystem.applyModelViewMatrix();
 
-        for (CoinSlotGroup group : layoutManager.getGroups()) {
-            int x0 = group.getGroupX();
-            int y0 = group.getGroupY();
-
-            event.getContainerScreen().setBlitOffset(100);
-            group.iterateSlots((gridX, gridY, slot, isBorrowed) -> {
-                // draw items
-                if (isBorrowed) {
-                    return;
-                }
-
-                RenderSystem.setShader(GameRenderer::getPositionTexShader);
-                drawSlotItem(event.getPoseStack(), x0, y0, gridX, gridY, slot);
-
-            });
-
-            event.getContainerScreen().setBlitOffset(0);
-
-        }
         hoveringSlot = null;
+        hoveringGroup = null;
         for (CoinSlotGroup group : layoutManager.getGroups()) {
 
             int x0 = group.getGroupX();
@@ -150,12 +138,69 @@ public class CoinGuiHandler extends GuiComponent {
                     AbstractContainerScreenAccessor accessor = (AbstractContainerScreenAccessor) screen;
                     accessor.setHoveredSlot(null);
                     hoveringSlot = slot;
-
-                    int x = x0 + gridX * 20 + 2;
-                    int y = y0 + gridY * 20 + 2;
-                    AbstractContainerScreen.renderSlotHighlight(event.getPoseStack(), x, y, screen.getBlitOffset(), SLOT_COLOR);
+                } else if (isMouseOverSlotBorder(mouseX, mouseY, x0, y0, gridX, gridY)) {
+                    hoveringGroup = group;
                 }
             });
+        }
+
+        int[] coinCounts = null;
+        boolean isShiftHolding = Screen.hasShiftDown();
+        if (hoveringSlot != null && isShiftHolding) {
+            ClientCoinStorage storage = ClientCoinStorage.INSTANCE;
+            List<CoinSlot> slots = storage.getSlots();
+            coinCounts = new int[slots.size()];
+            for (int i = 0; i < slots.size(); i++) {
+                coinCounts[i] = slots.get(i).getCount();
+            }
+
+            CoinManager manager = CoinManager.getInstance();
+            manager.inspectCoins(coinCounts, hoveringSlot.getId());
+        }
+
+        int[] finalCoinCounts = coinCounts;
+
+        for (CoinSlotGroup group : layoutManager.getGroups()) {
+            int x0 = group.getGroupX();
+            int y0 = group.getGroupY();
+
+            event.getContainerScreen().setBlitOffset(100);
+            group.iterateSlots((gridX, gridY, slot, isBorrowed) -> {
+                // draw items
+                if (isBorrowed) {
+                    return;
+                }
+
+                RenderSystem.setShader(GameRenderer::getPositionTexShader);
+
+                ItemStack stack = slot.getStack();
+                int count = 0;
+                if (finalCoinCounts != null) {
+                    count = finalCoinCounts[slot.getId()];
+                } else {
+                    count = slot.getCount();
+                }
+                int x = x0 + gridX * 20 + 2;
+                int y = y0 + gridY * 20 + 2;
+
+                drawSlotItem(event.getPoseStack(), x, y, stack, count);
+
+            });
+
+            event.getContainerScreen().setBlitOffset(0);
+
+        }
+
+        if (hoveringSlot != null) {
+            CoinSlotGroup group = layoutManager.getGroup(hoveringSlot.getId());
+            int x0 = group.getGroupX();
+            int y0 = group.getGroupY();
+
+            int gridX = group.getSlotX(hoveringSlot.getId());
+            int gridY = group.getSlotY(hoveringSlot.getId());
+            int x = x0 + gridX * 20 + 2;
+            int y = y0 + gridY * 20 + 2;
+            AbstractContainerScreen.renderSlotHighlight(event.getPoseStack(), x, y, screen.getBlitOffset(), SLOT_COLOR);
         }
 
         renderPoseStack.popPose();
@@ -169,21 +214,24 @@ public class CoinGuiHandler extends GuiComponent {
 
         RenderSystem.enableDepthTest();
         itemRenderer.renderAndDecorateItem(stack, x, y);
-        itemRenderer.renderGuiItemDecorations(minecraft.font, stack, x, y, String.valueOf(count));
+        // use smaller font if count is too large
+        Font font = minecraft.font;
 
+        poseStack.pushPose();
+        String s = String.valueOf(count);
+        poseStack.translate(x + 18, y + 18, 300.0D);
+        if (count > 999) {
+            poseStack.scale(0.6F, 0.6F, 0.6F);
+        } else if (count > 99) {
+            poseStack.scale(0.8F, 0.8F, 0.8F);
+        }
+        MultiBufferSource.BufferSource multibuffersource$buffersource = MultiBufferSource.immediate(Tesselator.getInstance().getBuilder());
+        font.drawInBatch(s, (float) (-font.width(s) - 1), -font.lineHeight, 0x00FFFFFF, true, poseStack.last().pose(), multibuffersource$buffersource, false, 0, 0xF000F0);
+        multibuffersource$buffersource.endBatch();
+//        itemRenderer.renderGuiItemDecorations(minecraft.font, stack, x, y, );
+
+        poseStack.popPose();
         itemRenderer.blitOffset = 0.0F;
-
-    }
-
-    private void drawSlotItem(PoseStack poseStack, int x0, int y0, int gridX, int gridY, CoinSlot slot) {
-
-        int x = x0 + gridX * 20 + 2;
-        int y = y0 + gridY * 20 + 2;
-
-        ItemStack stack = slot.getStack();
-        int count = slot.getCount();
-
-        drawSlotItem(poseStack, x, y, stack, count);
 
 
     }
@@ -191,6 +239,12 @@ public class CoinGuiHandler extends GuiComponent {
     private boolean isMouseOverSlot(int mouseX, int mouseY, int x0, int y0, int slotX, int slotY) {
         return mouseX >= x0 + slotX * 20 + 2 && mouseX < x0 + slotX * 20 + 18 &&
                 mouseY >= y0 + slotY * 20 + 2 && mouseY < y0 + slotY * 20 + 18;
+    }
+
+    private boolean isMouseOverSlotBorder(int mouseX, int mouseY, int x0, int y0, int slotX, int slotY) {
+        final int borderSize = 4;
+        return mouseX >= x0 + slotX * 20 - borderSize && mouseX < x0 + slotX * 20 + 20 + borderSize &&
+                mouseY >= y0 + slotY * 20 - borderSize && mouseY < y0 + slotY * 20 + 20 + borderSize;
     }
 
     private void drawSlot(PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {

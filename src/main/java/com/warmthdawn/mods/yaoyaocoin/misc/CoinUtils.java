@@ -1,15 +1,16 @@
 package com.warmthdawn.mods.yaoyaocoin.misc;
 
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
+import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
+import com.warmthdawn.mods.yaoyaocoin.gui.ClientCoinStorage;
 import com.warmthdawn.mods.yaoyaocoin.gui.CoinSlot;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketCoinSlotClicked;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 public class CoinUtils {
@@ -23,8 +24,50 @@ public class CoinUtils {
         StoreStack,
     }
 
-    public static ItemStack extractCoinAutoTransform(IItemHandlerModifiable inv, int slotId, int count) {
-        return inv.extractItem(slotId, count, false);
+
+    public static ItemStack extractCoinAutoTransform(CoinInventoryCapability.CoinInventory inv, int slotId, int count, Player player) {
+
+        CoinManager manager = CoinManager.getInstance();
+
+        int currentCount = inv.getCoinCount(slotId);
+        if (currentCount >= count) {
+            return inv.extractItem(slotId, count, false);
+        }
+
+        int[] coins = new int[manager.getCoinTypeCount()];
+        for (int i = 0; i < coins.length; i++) {
+            coins[i] = inv.getCoinCount(i);
+        }
+
+        long totalMoney = manager.getTotalMoney(coins);
+        int availableCount = (int) (totalMoney / manager.getCoinType(slotId).money());
+        count = Math.min(availableCount, count);
+
+        manager.computeCoins(totalMoney, coins, slotId, count);
+
+        ItemStack extractedStack = inv.getSampleStack(slotId);
+
+        extractedStack = ItemHandlerHelper.copyStackWithSize(extractedStack, count);
+
+        for (int i = 0; i < coins.length; i++) {
+            int newCount = coins[i];
+            CoinType coinType = manager.getCoinType(i);
+            ItemStack sampleStack = inv.getSampleStack(i);
+
+            if (newCount > coinType.maxStackSize()) {
+                ItemStack stackToGive = ItemHandlerHelper.copyStackWithSize(sampleStack, newCount - coinType.maxStackSize());
+                ItemHandlerHelper.giveItemToPlayer(player, stackToGive);
+                newCount = coinType.maxStackSize();
+            }
+            inv.setCoinCount(i, newCount);
+        }
+
+        if (extractedStack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        return extractedStack;
+
+
     }
 
     public static void handleSlotClickServer(int slotId, ClickType clickType, ItemStack stack, boolean autoTransform, Player player) {
@@ -36,7 +79,7 @@ public class CoinUtils {
             return;
         }
 
-        LazyOptional<IItemHandlerModifiable> inventory = player.getCapability(CoinCapability.COIN_INVENTORY);
+        LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
         ItemStack finalStack = stack;
         inventory.ifPresent(it -> {
             ItemStack slotStack = it.getStackInSlot(slotId);
@@ -45,11 +88,9 @@ public class CoinUtils {
                 case PickOne:
                 case PickStack:
                 case PickHalf: {
-
-                    if (slotStack.isEmpty() || !finalStack.isEmpty()) {
+                    if (!finalStack.isEmpty()) {
                         return;
                     }
-
                     int pickCount = switch (clickType) {
                         case PickOne -> 1;
                         case PickStack -> slotStack.getMaxStackSize();
@@ -58,10 +99,14 @@ public class CoinUtils {
                     };
 
                     ItemStack pickedStack = ItemStack.EMPTY;
-
                     if (autoTransform) {
-                        pickedStack = CoinUtils.extractCoinAutoTransform(it, slotId, pickCount);
+
+                        pickedStack = CoinUtils.extractCoinAutoTransform(it, slotId, pickCount, player);
                     } else {
+                        if (slotStack.isEmpty()) {
+                            return;
+                        }
+
                         pickedStack = it.extractItem(slotId, pickCount, false);
                     }
 
@@ -82,13 +127,13 @@ public class CoinUtils {
                         default -> 0;
                     };
 
-                    ItemStack stackToInsert = finalStack.copy();
-                    stackToInsert.setCount(insertCount);
+                    ItemStack stackToInsert = ItemHandlerHelper.copyStackWithSize(finalStack, insertCount);
 
                     ItemStack rest = it.insertItem(slotId, stackToInsert, false);
 
-                    ItemStack restStack = finalStack.copy();
-                    restStack.shrink(insertCount - rest.getCount());
+                    int restCount = finalStack.getCount() - insertCount + rest.getCount();
+
+                    ItemStack restStack = ItemHandlerHelper.copyStackWithSize(finalStack, restCount);
 
                     player.containerMenu.setCarried(restStack);
                     player.containerMenu.broadcastChanges();
@@ -101,7 +146,7 @@ public class CoinUtils {
 
 
     public static void sendSlotClickPacket(int slotId, ClickType clickType, ItemStack stack, boolean autoTransform) {
-        YaoYaoCoinNetwork.INSTANCE.sendToServer(new PacketCoinSlotClicked(slotId,autoTransform, clickType, stack));
+        YaoYaoCoinNetwork.INSTANCE.sendToServer(new PacketCoinSlotClicked(slotId, autoTransform, clickType, stack));
     }
 
     public static ItemStack handleSlotClick(CoinSlot slot, ItemStack stack, boolean isRightClick,
@@ -111,6 +156,7 @@ public class CoinUtils {
 
 
         CoinManager manager = CoinManager.getInstance();
+        ClientCoinStorage storage = ClientCoinStorage.INSTANCE;
         CoinType type = manager.getCoinType(slotId);
 
         if (type == null) {
@@ -136,24 +182,53 @@ public class CoinUtils {
 
             boolean autoTransform = false;
 
+            long totalMoney = 0;
+
             if (slot.getCount() < pickCount) {
 
                 if (isShiftHolding) {
-                    // TODO: compute auto transform
-                    autoTransform = true;
-                }
+                    for (int i = 0; i < manager.getCoinTypeCount(); i++) {
+                        CoinType coinType = manager.getCoinType(i);
+                        CoinSlot slotIt = storage.getSlots().get(i);
+                        totalMoney += (long) coinType.money() * slotIt.getCount();
+                    }
 
-                pickCount = slot.getCount();
+                    int availableCount = (int) (totalMoney / type.money());
+
+                    pickCount = Math.min(availableCount, pickCount);
+                    autoTransform = true;
+                } else {
+                    pickCount = slot.getCount();
+                }
             }
 
             if (pickCount == 0) {
                 return ItemStack.EMPTY;
             }
-
             ItemStack pickedStack = slot.getStack().copy();
-
             pickedStack.setCount(pickCount);
-            slot.setCount(slot.getCount() - pickCount);
+            if (autoTransform) {
+
+                int[] coins = new int[manager.getCoinTypeCount()];
+                for (int i = 0; i < coins.length; i++) {
+                    CoinSlot slotIt = storage.getSlots().get(i);
+                    coins[i] = slotIt.getCount();
+                }
+
+                manager.computeCoins(totalMoney, coins, slotId, pickCount);
+
+                for (int i = 0; i < coins.length; i++) {
+                    CoinSlot slotIt = storage.getSlots().get(i);
+                    CoinType coinType = manager.getCoinType(i);
+                    if (coins[i] > coinType.maxStackSize()) {
+                        coins[i] = coinType.maxStackSize();
+                    }
+                    slotIt.setCount(coins[i]);
+                }
+            } else {
+                pickedStack.setCount(pickCount);
+                slot.setCount(slot.getCount() - pickCount);
+            }
 
             sendSlotClickPacket(slotId, clickType, ItemStack.EMPTY, autoTransform);
 

@@ -10,7 +10,6 @@ public record CoinType(
         int id,
         String name,
         int money,
-        int moneyDenominator,
         int maxStackSize,
         ResourceLocation itemName,
         Tag itemTag

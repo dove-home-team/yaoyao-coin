@@ -15,10 +15,7 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class CoinInventoryCapability {
 
@@ -47,40 +44,73 @@ public class CoinInventoryCapability {
     }
 
     public static class CoinInventory implements IItemHandlerModifiable, INBTSerializable<Tag> {
-        private final NonNullList<ItemStack> stacks;
+        private final NonNullList<ItemStack> sampleStacks;
+        private final int[] coinsCounts;
         private final ArrayList<ItemStack> invalidStacks;
 
         public CoinInventory() {
             CoinManager manager = CoinManager.getInstance();
 
-            List<ItemStack> initial = manager.createInventoryStacks();
 
-            stacks = NonNullList.withSize(initial.size(), ItemStack.EMPTY);
+            sampleStacks = NonNullList.withSize(manager.getCoinTypeCount(), ItemStack.EMPTY);
+            coinsCounts = new int[manager.getCoinTypeCount()];
 
-            for (int i = 0; i < initial.size(); i++) {
-                stacks.set(i, initial.get(i));
+            for (int i = 0; i < manager.getCoinTypeCount(); i++) {
+                CoinType type = manager.getCoinType(i);
+                sampleStacks.set(i, type.createItemStack());
+                coinsCounts[i] = 0;
             }
+
 
             invalidStacks = new ArrayList<>();
         }
 
+        public int getCoinCount(int slot) {
+            return coinsCounts[slot];
+        }
+        public ItemStack getSampleStack(int slot) {
+            return sampleStacks.get(slot);
+        }
+
+        public void setCoinCount(int slot, int count) {
+            coinsCounts[slot] = count;
+        }
+
         @Override
         public void setStackInSlot(int slot, @NotNull ItemStack stack) {
-            stacks.set(slot, stack);
+            if (slot < 0 || slot >= sampleStacks.size()) {
+                return;
+            }
+
+            if (stack.isEmpty()) {
+                coinsCounts[slot] = 0;
+            }
+            if (!ItemHandlerHelper.canItemStacksStack(stack, sampleStacks.get(slot))) {
+                invalidStacks.add(stack);
+                return;
+            }
+
+            coinsCounts[slot] = stack.getCount();
         }
 
         @Override
         public int getSlots() {
-            return stacks.size();
+            return sampleStacks.size();
         }
 
         @NotNull
         @Override
         public ItemStack getStackInSlot(int slot) {
-            if(slot < 0 || slot >= stacks.size()) {
+            if (slot < 0 || slot >= sampleStacks.size()) {
                 return ItemStack.EMPTY;
             }
-            return stacks.get(slot);
+            if (coinsCounts[slot] == 0) {
+                return ItemStack.EMPTY;
+            }
+
+            ItemStack stack = sampleStacks.get(slot);
+
+            return ItemHandlerHelper.copyStackWithSize(stack, coinsCounts[slot]);
         }
 
         @NotNull
@@ -90,26 +120,15 @@ public class CoinInventoryCapability {
                 return ItemStack.EMPTY;
             }
 
-            CoinManager manager = CoinManager.getInstance();
-            CoinType type = manager.getCoinType(slot);
-            if (type == null) {
-                return stack;
-            }
-
-            if (!type.matches(stack)) {
-                return stack;
-            }
-
-
-            ItemStack existing = stacks.get(slot);
             int limit = getSlotLimit(slot);
 
-            if (!existing.isEmpty()) {
-                if (!ItemHandlerHelper.canItemStacksStack(stack, existing))
-                    return stack;
+            ItemStack sample = sampleStacks.get(slot);
 
-                limit -= existing.getCount();
-            }
+            if (!ItemHandlerHelper.canItemStacksStack(stack, sample))
+                return stack;
+
+            int existingCount = coinsCounts[slot];
+            limit -= existingCount;
 
             if (limit <= 0)
                 return stack;
@@ -118,10 +137,10 @@ public class CoinInventoryCapability {
             boolean reachedLimit = stack.getCount() > limit;
 
             if (!simulate) {
-                if (existing.isEmpty()) {
-                    stacks.set(slot, reachedLimit ? ItemHandlerHelper.copyStackWithSize(stack, limit) : stack);
+                if (reachedLimit) {
+                    coinsCounts[slot] = existingCount + limit;
                 } else {
-                    existing.grow(reachedLimit ? limit : stack.getCount());
+                    coinsCounts[slot] = existingCount + stack.getCount();
                 }
             }
 
@@ -138,29 +157,32 @@ public class CoinInventoryCapability {
             if (amount == 0)
                 return ItemStack.EMPTY;
 
-            ItemStack existing = stacks.get(slot);
-
-            if (existing.isEmpty())
+            int existingCount = coinsCounts[slot];
+            if (existingCount == 0)
                 return ItemStack.EMPTY;
 
-            int toExtract = Math.min(amount, existing.getMaxStackSize());
 
-            if (existing.getCount() <= toExtract) {
+            ItemStack sample = sampleStacks.get(slot);
+
+
+            int toExtract = Math.min(amount, sample.getMaxStackSize());
+
+            if (existingCount <= toExtract) {
                 if (!simulate) {
-                    stacks.set(slot, ItemHandlerHelper.copyStackWithSize(existing, 0));
+                    coinsCounts[slot] = 0;
                 }
-                return existing;
+                return ItemHandlerHelper.copyStackWithSize(sample, existingCount);
             } else {
                 if (!simulate) {
-                    stacks.set(slot, ItemHandlerHelper.copyStackWithSize(existing, existing.getCount() - toExtract));
+                    coinsCounts[slot] = existingCount - toExtract;
                 }
 
-                return ItemHandlerHelper.copyStackWithSize(existing, toExtract);
+                return ItemHandlerHelper.copyStackWithSize(sample, toExtract);
             }
         }
 
         public void clear() {
-            stacks.replaceAll(itemStack -> ItemHandlerHelper.copyStackWithSize(itemStack, 0));
+            Arrays.fill(coinsCounts, 0);
         }
 
         public List<ItemStack> getInvalidStacks() {
@@ -172,7 +194,7 @@ public class CoinInventoryCapability {
         public int getSlotLimit(int slot) {
             CoinManager manager = CoinManager.getInstance();
             CoinType type = manager.getCoinType(slot);
-            if(type == null) {
+            if (type == null) {
                 return 0;
             }
 
@@ -186,13 +208,13 @@ public class CoinInventoryCapability {
 
         public Map<CoinType, Integer> getCoinMap() {
             Map<CoinType, Integer> map = new HashMap<>();
-            for (int i = 0; i < stacks.size(); i++) {
-                ItemStack stack = stacks.get(i);
-                if (stack.isEmpty()) {
+            for (int i = 0; i < coinsCounts.length; i++) {
+                int count = coinsCounts[i];
+                if (count == 0) {
                     continue;
                 }
                 CoinType type = CoinManager.getInstance().getCoinType(i);
-                map.put(type, stack.getCount());
+                map.put(type, count);
             }
             return map;
         }
@@ -202,17 +224,19 @@ public class CoinInventoryCapability {
             CompoundTag nbt = new CompoundTag();
 
             CompoundTag stacksTag = new CompoundTag();
-            nbt.put("stacks", stacksTag);
+            nbt.put("coins", stacksTag);
 
             CoinManager manager = CoinManager.getInstance();
-            for (int i = 0; i < stacks.size(); i++) {
-                ItemStack stack = stacks.get(i);
-                if (stack.isEmpty()) {
-                    continue;
-                }
+            for (int i = 0; i < sampleStacks.size(); i++) {
+                ItemStack sampleStack = sampleStacks.get(i);
+                int count = coinsCounts[i];
+
+                CompoundTag entry = new CompoundTag();
+                entry.put("item", sampleStack.serializeNBT());
+                entry.putInt("count", count);
 
                 String name = manager.getCoinType(i).name();
-                stacksTag.put(name, stack.serializeNBT());
+                stacksTag.put(name, entry);
             }
 
             if (invalidStacks.isEmpty()) {
@@ -233,27 +257,45 @@ public class CoinInventoryCapability {
                 return;
             }
             CoinManager manager = CoinManager.getInstance();
-            CompoundTag stacksTag = tag.getCompound("stacks");
+            CompoundTag stacksTag = tag.getCompound("coins");
 
             for (String key : stacksTag.getAllKeys()) {
-                ItemStack stack = ItemStack.of(stacksTag.getCompound(key));
-                if (stack.isEmpty()) {
+                CompoundTag entry = stacksTag.getCompound(key);
+
+                if (!entry.contains("item") || !entry.contains("count")) {
                     continue;
                 }
+
+                ItemStack sample = ItemStack.of(entry.getCompound("item"));
+                int count = entry.getInt("count");
+
 
                 CoinType type = manager.findCoinType(key);
                 if (type == null) {
                     YaoYaoCoin.LOGGER.warn("Invalid coin type: {}", key);
-                    invalidStacks.add(stack);
+                    while (count > 0) {
+                        int stackSize = Math.min(count, sample.getMaxStackSize());
+                        ItemStack stack = ItemHandlerHelper.copyStackWithSize(sample, stackSize);
+                        invalidStacks.add(stack);
+                        count -= stackSize;
+                    }
                     continue;
                 }
 
-                if (!type.matches(stack)) {
-                    YaoYaoCoin.LOGGER.warn("Invalid coin stack: {}", stack);
-                    invalidStacks.add(stack);
+                if (!type.matches(sample)) {
+                    YaoYaoCoin.LOGGER.warn("Invalid coin stack: {}", sample);
+
+                    while (count > 0) {
+                        int stackSize = Math.min(count, sample.getMaxStackSize());
+                        ItemStack stack = ItemHandlerHelper.copyStackWithSize(sample, stackSize);
+                        invalidStacks.add(stack);
+                        count -= stackSize;
+                    }
                     continue;
                 }
-                stacks.set(type.id(), stack);
+
+                int slot = type.id();
+                coinsCounts[slot] = count;
             }
 
             ListTag invalidStacksTag = tag.getList("invalidStacks", 10);

@@ -90,6 +90,17 @@ public class CoinInventoryCapability {
                 return ItemStack.EMPTY;
             }
 
+            CoinManager manager = CoinManager.getInstance();
+            CoinType type = manager.getCoinType(slot);
+            if (type == null) {
+                return stack;
+            }
+
+            if (!type.matches(stack)) {
+                return stack;
+            }
+
+
             ItemStack existing = stacks.get(slot);
             int limit = getSlotLimit(slot);
 

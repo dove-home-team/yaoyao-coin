@@ -2,12 +2,15 @@ package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
 import com.warmthdawn.mods.yaoyaocoin.mixin.AbstractContainerScreenAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.event.ContainerScreenEvent;
 import net.minecraftforge.client.event.ScreenEvent;
@@ -21,13 +24,58 @@ public class CoinGuiHandler extends GuiComponent {
         modEventBus.addListener(this::onDrawBackground);
         modEventBus.addListener(this::onDrawForeground);
         modEventBus.addListener(this::onInit);
-
+        modEventBus.addListener(this::onMouseClick);
+        modEventBus.addListener(this::onMouseRelease);
 
     }
 
     private static final int SLOT_COLOR = 0x80FFFFFF;
 
 
+    private boolean isLeftMouseDown = false;
+    private boolean ignoreMouseUp = false;
+    private CoinSlot hoveringSlot = null;
+    private CoinSlotGroup hoveringGroup = null;
+
+    private void onMouseRelease(ScreenEvent.MouseReleasedEvent.Pre event) {
+        if (event.getButton() == 0) {
+            isLeftMouseDown = false;
+        }
+
+        if (ignoreMouseUp) {
+            event.setCanceled(true);
+            ignoreMouseUp = false;
+        }
+    }
+
+    private void onMouseClick(ScreenEvent.MouseClickedEvent.Pre event) {
+        if (event.getButton() == 0) {
+            isLeftMouseDown = true;
+        }
+
+        if (event.getScreen() instanceof AbstractContainerScreen<?> screen) {
+            double mouseX = event.getMouseX();
+            double mouseY = event.getMouseY();
+
+            if (hoveringSlot != null) {
+                Player player = Minecraft.getInstance().player;
+                if (player != null) {
+                    ItemStack mouseItem = screen.getMenu().getCarried();
+                    boolean isRightClick = event.getButton() == 1;
+
+                    boolean isShiftHolding = Screen.hasShiftDown();
+                    ItemStack stack = CoinUtils.handleSlotClick(hoveringSlot, mouseItem, isRightClick, isShiftHolding);
+                    screen.getMenu().setCarried(stack);
+                }
+                ignoreMouseUp = true;
+                event.setCanceled(true);
+            } else if (hoveringGroup != null) {
+                // Prevent click-through on the background and border of the slot
+                event.setCanceled(true);
+                ignoreMouseUp = true;
+            }
+        }
+    }
 
 
     public void onInit(ScreenEvent.InitScreenEvent.Post event) {
@@ -70,7 +118,7 @@ public class CoinGuiHandler extends GuiComponent {
         renderPoseStack.translate(-screen.getGuiLeft(), -screen.getGuiTop(), 0);
         RenderSystem.applyModelViewMatrix();
 
-        for(CoinSlotGroup group : layoutManager.getGroups()) {
+        for (CoinSlotGroup group : layoutManager.getGroups()) {
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
 
@@ -89,18 +137,19 @@ public class CoinGuiHandler extends GuiComponent {
             event.getContainerScreen().setBlitOffset(0);
 
         }
-
-        for(CoinSlotGroup group : layoutManager.getGroups()) {
+        hoveringSlot = null;
+        for (CoinSlotGroup group : layoutManager.getGroups()) {
 
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
             group.iterateSlots((gridX, gridY, slot, isBorrowed) -> {
-                if(isBorrowed) {
+                if (isBorrowed) {
                     return;
                 }
-                if(isMouseOverSlot(mouseX, mouseY, x0, y0, gridX, gridY)) {
+                if (isMouseOverSlot(mouseX, mouseY, x0, y0, gridX, gridY)) {
                     AbstractContainerScreenAccessor accessor = (AbstractContainerScreenAccessor) screen;
                     accessor.setHoveredSlot(null);
+                    hoveringSlot = slot;
 
                     int x = x0 + gridX * 20 + 2;
                     int y = y0 + gridY * 20 + 2;
@@ -140,7 +189,7 @@ public class CoinGuiHandler extends GuiComponent {
     }
 
     private boolean isMouseOverSlot(int mouseX, int mouseY, int x0, int y0, int slotX, int slotY) {
-        return mouseX >= x0 + slotX * 20  + 2 && mouseX < x0 + slotX * 20 + 18 &&
+        return mouseX >= x0 + slotX * 20 + 2 && mouseX < x0 + slotX * 20 + 18 &&
                 mouseY >= y0 + slotY * 20 + 2 && mouseY < y0 + slotY * 20 + 18;
     }
 

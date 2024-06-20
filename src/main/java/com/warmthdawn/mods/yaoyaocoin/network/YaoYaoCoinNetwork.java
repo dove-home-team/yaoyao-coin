@@ -23,5 +23,11 @@ public class YaoYaoCoinNetwork {
                 .consumer(PacketSyncCoin::messageConsumer)
                 .add();
 
+        INSTANCE.messageBuilder(PacketCoinSlotClicked.class, id++)
+                .encoder(PacketCoinSlotClicked::encoder)
+                .decoder(PacketCoinSlotClicked::decoder)
+                .consumer(PacketCoinSlotClicked::handle)
+                .add();
+
     }
 }

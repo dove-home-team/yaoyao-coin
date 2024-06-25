@@ -21,6 +21,7 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class CoinGuiHandler extends GuiComponent {
 
@@ -61,13 +62,18 @@ public class CoinGuiHandler extends GuiComponent {
         }
 
         if (draggingGroup != null) {
-            draggingGroup = null;
-            draggingStartX = 0;
-            draggingStartY = 0;
-            prevDraggingX = 0;
-            prevDraggingY = 0;
-            // TODO: finish dragging
+            resetDragging();
+
+
         }
+    }
+
+    private void resetDragging() {
+        draggingGroup = null;
+        draggingStartX = 0;
+        draggingStartY = 0;
+        prevDraggingX = 0;
+        prevDraggingY = 0;
     }
 
     private void onMouseClick(ScreenEvent.MouseClickedEvent.Pre event) {
@@ -94,12 +100,28 @@ public class CoinGuiHandler extends GuiComponent {
             } else if (hoveringGroup != null) {
                 // Prevent click-through on the background and border of the slot
                 boolean isShiftHolding = Screen.hasShiftDown();
-                if (isShiftHolding) {
+                if (isShiftHolding || hoveringGroup.isSingle()) {
                     draggingGroup = hoveringGroup;
                     draggingStartX = mouseX;
                     draggingStartY = mouseY;
                     prevDraggingX = draggingGroup.getGroupX();
                     prevDraggingY = draggingGroup.getGroupY();
+                } else {
+
+                    int hoveringSlotId = findHoveringSlotConsideringBorder(hoveringGroup, (int) mouseX, (int) mouseY);
+
+                    if (hoveringSlotId >= 0) {
+
+                        draggingGroup = layoutManager.takeSlot(hoveringSlotId, hoveringGroup);
+                        hoveringGroup = draggingGroup;
+
+                        draggingStartX = mouseX;
+                        draggingStartY = mouseY;
+                        prevDraggingX = draggingGroup.getGroupX();
+                        prevDraggingY = draggingGroup.getGroupY();
+
+                    }
+
                 }
 
 
@@ -114,17 +136,12 @@ public class CoinGuiHandler extends GuiComponent {
         if (event.getScreen() instanceof AbstractContainerScreen<?> screen) {
 
             layoutManager.init(screen);
-        }
-        else
-        {
+        } else {
             layoutManager.clear();
         }
 
-        this.draggingStartX = 0;
-        this.draggingStartY = 0;
-        this.prevDraggingX = 0;
-        this.prevDraggingY = 0;
-        this.draggingGroup = null;
+
+        resetDragging();
         this.hoveringSlot = null;
         this.hoveringGroup = null;
         this.isLeftMouseDown = false;
@@ -295,9 +312,52 @@ public class CoinGuiHandler extends GuiComponent {
     }
 
     private boolean isMouseOverSlotBorder(int mouseX, int mouseY, int x0, int y0, int slotX, int slotY) {
-        final int borderSize = 4;
+        return isMouseOverSlotBorder(mouseX, mouseY, x0, y0, slotX, slotY, 4);
+    }
+
+    private boolean isMouseOverSlotBorder(int mouseX, int mouseY, int x0, int y0, int slotX, int slotY, int borderSize) {
         return mouseX >= x0 + slotX * 20 - borderSize && mouseX < x0 + slotX * 20 + 20 + borderSize &&
                 mouseY >= y0 + slotY * 20 - borderSize && mouseY < y0 + slotY * 20 + 20 + borderSize;
+    }
+
+    private int findHoveringSlotConsideringBorder(CoinSlotGroup group, int mouseX, int mouseY) {
+        int x0 = group.getGroupX();
+        int y0 = group.getGroupY();
+        int slotId = group.findSlot((slotX, slotY, slot, isBorrowed) -> {
+            if (isBorrowed) {
+                return false;
+            }
+            return isMouseOverSlotBorder(mouseX, mouseY, x0, y0, slotX, slotY, 0);
+        });
+
+        if (slotId < 0) {
+            AtomicInteger slotIdRef = new AtomicInteger(-1);
+            AtomicInteger minDistanceSqRef = new AtomicInteger(Integer.MAX_VALUE);
+            group.iterateSlots((slotX, slotY, slot, isBorrowed) -> {
+                if (isBorrowed) {
+                    return;
+                }
+                boolean isMouseOver = isMouseOverSlotBorder(mouseX, mouseY, x0, y0, slotX, slotY, 4);
+                if (!isMouseOver) {
+                    return;
+                }
+
+                int dx = mouseX - x0 - slotX * 20 - 10;
+                int dy = mouseY - y0 - slotY * 20 - 10;
+
+                int distanceSq = dx * dx + dy * dy;
+
+                if (distanceSq < minDistanceSqRef.get()) {
+                    minDistanceSqRef.set(distanceSq);
+                    slotIdRef.set(slot.getId());
+                }
+
+            });
+
+            slotId = slotIdRef.get();
+        }
+
+        return slotId;
     }
 
     private void drawSlot(PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {
@@ -316,16 +376,16 @@ public class CoinGuiHandler extends GuiComponent {
         CoinSlotGroup.NeighborKind left = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.LEFT);
         CoinSlotGroup.NeighborKind upLeft = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP_LEFT);
 
-        if (up == CoinSlotGroup.NeighborKind.Slot) {
+        if (up != CoinSlotGroup.NeighborKind.Empty) {
 
-            if (left == CoinSlotGroup.NeighborKind.Slot) {
+            if (left != CoinSlotGroup.NeighborKind.Empty) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_LEFT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
             }
-        } else if (left == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (left != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
-        } else if (upLeft == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (upLeft != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_LEFT_1);
         }
 
@@ -335,15 +395,15 @@ public class CoinGuiHandler extends GuiComponent {
         CoinSlotGroup.NeighborKind upRight = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP_RIGHT);
         CoinSlotGroup.NeighborKind right = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.RIGHT);
 
-        if (up == CoinSlotGroup.NeighborKind.Slot) {
-            if (right == CoinSlotGroup.NeighborKind.Slot) {
+        if (up != CoinSlotGroup.NeighborKind.Empty) {
+            if (right != CoinSlotGroup.NeighborKind.Empty) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_RIGHT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
             }
-        } else if (right == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (right != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
-        } else if (upRight == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (upRight != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_RIGHT_1);
         }
 
@@ -354,15 +414,15 @@ public class CoinGuiHandler extends GuiComponent {
         CoinSlotGroup.NeighborKind down = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN);
         CoinSlotGroup.NeighborKind bottomLeft = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN_LEFT);
 
-        if (down == CoinSlotGroup.NeighborKind.Slot) {
-            if (left == CoinSlotGroup.NeighborKind.Slot) {
+        if (down != CoinSlotGroup.NeighborKind.Empty) {
+            if (left != CoinSlotGroup.NeighborKind.Empty) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_LEFT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
             }
-        } else if (left == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (left != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
-        } else if (bottomLeft == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (bottomLeft != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_LEFT_1);
         }
 
@@ -372,15 +432,15 @@ public class CoinGuiHandler extends GuiComponent {
         y = y0 + 10;
         CoinSlotGroup.NeighborKind bottomRight = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN_RIGHT);
 
-        if (down == CoinSlotGroup.NeighborKind.Slot) {
-            if (right == CoinSlotGroup.NeighborKind.Slot) {
+        if (down != CoinSlotGroup.NeighborKind.Empty) {
+            if (right != CoinSlotGroup.NeighborKind.Empty) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_RIGHT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
             }
-        } else if (right == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (right != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
-        } else if (bottomRight == CoinSlotGroup.NeighborKind.Slot) {
+        } else if (bottomRight != CoinSlotGroup.NeighborKind.Empty) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_RIGHT_1);
         }
 

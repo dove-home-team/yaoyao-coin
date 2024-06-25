@@ -1,10 +1,16 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
+import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
+import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +22,8 @@ public class LayoutManager {
     private final Int2IntOpenHashMap slotIdToGroupIndex = new Int2IntOpenHashMap();
 
     private static final int SLOT_SIZE = 20;
+
+    private final Logger logger = LogUtils.getLogger();
 
 
     public LayoutManager() {
@@ -36,12 +44,6 @@ public class LayoutManager {
 
 
     public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y) {
-        int prevX = group.getGroupX();
-        int prevY = group.getGroupY();
-
-        int dx = x - prevX;
-        int dy = y - prevY;
-
         int newX = x;
         int newY = y;
         // collisions to center rect
@@ -52,6 +54,7 @@ public class LayoutManager {
         int screenX1 = screenX0 + screen.getXSize();
         int screenY1 = screenY0 + screen.getYSize();
 
+        // 计算碰撞
         for (Rect2i rect : group.getCollisionRects()) {
             // check if collisionRects is inside screen rect
 
@@ -76,13 +79,13 @@ public class LayoutManager {
                 int yBottom = screenY1 - rectY0;
 
                 int stoppedX;
-                if(Math.abs(newX - xLeft) < Math.abs(newX - xRight)) {
+                if (Math.abs(newX - xLeft) < Math.abs(newX - xRight)) {
                     stoppedX = xLeft;
                 } else {
                     stoppedX = xRight;
                 }
                 int stoppedY;
-                if(Math.abs(newY - yTop) < Math.abs(newY - yBottom)) {
+                if (Math.abs(newY - yTop) < Math.abs(newY - yBottom)) {
                     stoppedY = yTop;
                 } else {
                     stoppedY = yBottom;
@@ -98,10 +101,50 @@ public class LayoutManager {
             }
         }
 
+        // 计算吸附
+
+
         group.setGroupX(newX);
         group.setGroupY(newY);
 
 
+    }
+
+    private void rebuildGroupIndex(){
+        slotIdToGroupIndex.clear();
+        for (int i = 0; i < groups.size(); i++) {
+            CoinSlotGroup group = groups.get(i);
+            final int groupIndex = i;
+            group.iterateSlots((slotX, slotY, slot, borrowed) -> {
+                if(!borrowed){
+                    slotIdToGroupIndex.put(slot.getId(), groupIndex);
+                }
+            });
+        }
+    }
+
+    public CoinSlotGroup takeSlot(int slotId, CoinSlotGroup group) {
+        CoinSlotGroup newGroup = new CoinSlotGroup();
+        newGroup.setGroupX(group.getGroupX());
+        newGroup.setGroupY(group.getGroupY());
+        newGroup.takeSlot(slotId, group);
+        groups.add(newGroup);
+        splitGroup(group);
+        rebuildGroupIndex();
+        return newGroup;
+    }
+
+    private void splitGroup(CoinSlotGroup group) {
+
+        ArrayList<CoinSlotGroup> splitted = new ArrayList<>();
+        boolean doSplit = group.splitUnConnected(splitted);
+
+        if(!doSplit){
+            return;
+        }
+
+        groups.remove(group);
+        groups.addAll(splitted);
     }
 
     public void init(AbstractContainerScreen<?> screen) {
@@ -128,7 +171,6 @@ public class LayoutManager {
 
                 int slotId = manager.findCoinType(slot.name).id();
                 CoinSlot clientSlot = storage.getSlots().get(slotId);
-                slotIdToGroupIndex.put(slotId, i);
                 slotGroup.addSlot(slot.x, slot.y, clientSlot, false);
 
                 maxX = Math.max(maxX, slot.x);
@@ -136,6 +178,8 @@ public class LayoutManager {
                 minX = Math.min(minX, slot.x);
                 minY = Math.min(minY, slot.y);
             }
+            slotGroup.endUpdate();
+
             // x
             switch (group.area) {
                 case TOP_LEFT, CENTER_LEFT, BOTTOM_LEFT -> {
@@ -180,9 +224,9 @@ public class LayoutManager {
             }
 
             groups.add(slotGroup);
-            slotGroup.endUpdate();
-
         }
+
+        rebuildGroupIndex();
     }
 
     public CoinSlotGroup getGroup(int slotId) {

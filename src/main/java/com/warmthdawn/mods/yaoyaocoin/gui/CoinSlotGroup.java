@@ -1,6 +1,10 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
+import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.client.renderer.Rect2i;
 
 import java.util.ArrayList;
@@ -9,6 +13,10 @@ import java.util.List;
 
 public class CoinSlotGroup {
 
+
+    public boolean isSingle() {
+        return slots.size() == 1;
+    }
 
     public enum Neighbour {
         UP,
@@ -24,12 +32,17 @@ public class CoinSlotGroup {
 
 
     public enum NeighborKind {
-        Slot,
+        Slot_Owned,
+        Slot_Borrowed,
         Empty
     }
 
     public interface SlotConsumer {
         void accept(int x, int y, CoinSlot slot, boolean borrowed);
+    }
+
+    public interface SlotPredicate {
+        boolean test(int x, int y, CoinSlot slot, boolean borrowed);
     }
 
     private final ArrayList<Entry> slots = new ArrayList<>();
@@ -47,8 +60,10 @@ public class CoinSlotGroup {
 
     private int groupX = 0;
     private int groupY = 0;
-    private List<Rect2i> collisionRects = new ArrayList<>();
+    private final List<Rect2i> collisionRects = new ArrayList<>();
+    private final List<Rect2i> adsorptionRects = new ArrayList<>();
     private boolean updating = false;
+    private boolean discard = false;
 
     public List<Rect2i> getCollisionRects() {
         return collisionRects;
@@ -56,8 +71,10 @@ public class CoinSlotGroup {
 
 
     private void rebuildSlotGrid() {
-        int maxGridX = 0;
-        int maxGridY = 0;
+        int maxGridX = Integer.MIN_VALUE;
+        int maxGridY = Integer.MIN_VALUE;
+        int minGridX = Integer.MAX_VALUE;
+        int minGridY = Integer.MAX_VALUE;
 
         for (Entry entry : slots) {
             if (entry.isBorrowed) {
@@ -65,10 +82,12 @@ public class CoinSlotGroup {
             }
             maxGridX = Math.max(maxGridX, entry.girdX);
             maxGridY = Math.max(maxGridY, entry.gridY);
+            minGridX = Math.min(minGridX, entry.girdX);
+            minGridY = Math.min(minGridY, entry.gridY);
         }
 
-        gridWidth = maxGridX + 1;
-        gridHeight = maxGridY + 1;
+        gridWidth = maxGridX - minGridX + 1;
+        gridHeight = maxGridY - minGridY + 1;
 
         slotGrid = new int[gridHeight * gridWidth];
 
@@ -76,7 +95,18 @@ public class CoinSlotGroup {
 
         for (int i = 0; i < slots.size(); i++) {
             Entry entry = slots.get(i);
+
+            if(minGridX != 0 || minGridY != 0){
+                entry = new Entry(entry.girdX - minGridX, entry.gridY - minGridY, entry.slotId, entry.isBorrowed);
+                slots.set(i, entry);
+            }
+
             slotGrid[entry.girdX + entry.gridY * gridWidth] = i;
+        }
+
+        if(minGridX != 0 || minGridY != 0){
+            groupX += minGridX * 20;
+            groupY += minGridY * 20;
         }
 
         slotIdToIndex.clear();
@@ -89,12 +119,52 @@ public class CoinSlotGroup {
 
     private void computeCollisionRects() {
         collisionRects.clear();
-        boolean[] visited = new boolean[slots.size()];
+        boolean[][] visitedColl = new boolean[gridHeight][gridWidth];
 
         for (int i = 0; i < gridHeight; i++) {
             for (int j = 0; j < gridWidth; j++) {
+                if (visitedColl[i][j]) {
+                    continue;
+                }
                 Entry entry = getSlotAt(j, i);
-                if (entry == null || entry.isBorrowed || visited[slotIdToIndex.get(entry.slotId)]) {
+                if (entry == null || entry.isBorrowed) {
+                    continue;
+                }
+                int minX = j;
+                int minY = i;
+                int maxX = j;
+                int maxY = i;
+                visitedColl[i][j] = true;
+
+                for (int k = i; k < gridHeight; k++) {
+                    for (int l = j; l < gridWidth; l++) {
+                        Entry other = getSlotAt(l, k);
+                        if (other == null || other.isBorrowed || other.slotId == entry.slotId) {
+                            continue;
+                        }
+                        if (visitedColl[k][l]) {
+                            break;
+                        }
+                        minX = Math.min(minX, l);
+                        minY = Math.min(minY, k);
+                        maxX = Math.max(maxX, l);
+                        maxY = Math.max(maxY, k);
+                        visitedColl[k][l] = true;
+                    }
+                }
+                collisionRects.add(new Rect2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
+
+            }
+        }
+
+        boolean[][] visitedAds = new boolean[gridHeight + 2][gridWidth + 2];
+        for (int i = -1; i <= gridHeight; i++) {
+            for (int j = -1; j <= gridWidth; j++) {
+                if (visitedAds[i + 1][j + 1]) {
+                    continue;
+                }
+                boolean isAdsorption = isAdsorptionSlot(j, i);
+                if (!isAdsorption) {
                     continue;
                 }
 
@@ -102,36 +172,77 @@ public class CoinSlotGroup {
                 int minY = i;
                 int maxX = j;
                 int maxY = i;
+                visitedAds[i + 1][j + 1] = true;
 
-                for (int k = 0; k < gridHeight; k++) {
-                    for (int l = 0; l < gridWidth; l++) {
-                        Entry other = getSlotAt(l, k);
-                        if (other == null || other.isBorrowed || other.slotId != entry.slotId) {
+                for (int k = i; k <= gridHeight; k++) {
+                    for (int l = j; l <= gridWidth; l++) {
+                        if (k == i && l == j) {
                             continue;
                         }
 
+                        if (visitedAds[k + 1][l + 1]) {
+                            break;
+                        }
+                        boolean isAdsorptionOther = isAdsorptionSlot(l, k);
+                        if (!isAdsorptionOther) {
+                            continue;
+                        }
                         minX = Math.min(minX, l);
                         minY = Math.min(minY, k);
                         maxX = Math.max(maxX, l);
                         maxY = Math.max(maxY, k);
-                        visited[slotIdToIndex.get(other.slotId)] = true;
+                        visitedAds[k + 1][l + 1] = true;
                     }
                 }
 
-                collisionRects.add(new Rect2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
-
+                adsorptionRects.add(new Rect2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
             }
         }
     }
 
     public void addSlot(int gridX, int gridY, CoinSlot slot, boolean borrowed) {
         slots.add(new Entry(gridX, gridY, slot.getId(), borrowed));
-        if (updating) {
+        if (!updating) {
             rebuildSlotGrid();
 
             if (!borrowed) {
                 computeCollisionRects();
             }
+        }
+    }
+
+    public void discardGroup() {
+        discard = true;
+    }
+
+    public void removeSlot(int slotId) {
+        if (discard) {
+            return;
+        }
+        int index = slotIdToIndex.getOrDefault(slotId, -1);
+        if (index < 0) {
+            return;
+        }
+        slots.remove(index);
+        if (!updating) {
+            rebuildSlotGrid();
+            computeCollisionRects();
+        }
+    }
+
+    public void takeSlot(int slotId, CoinSlotGroup other) {
+        int index = other.slotIdToIndex.getOrDefault(slotId, -1);
+        if (index < 0) {
+            return;
+        }
+        Entry entry = other.slots.get(index);
+        this.slots.add(entry);
+
+        other.removeSlot(slotId);
+
+        if (!updating) {
+            rebuildSlotGrid();
+            computeCollisionRects();
         }
     }
 
@@ -216,6 +327,16 @@ public class CoinSlotGroup {
         return gridHeight;
     }
 
+    public int findSlot(SlotPredicate predicate) {
+        for (Entry entry : slots) {
+            CoinSlot slot = ClientCoinStorage.INSTANCE.getSlots().get(entry.slotId);
+            if (predicate.test(entry.girdX, entry.gridY, slot, entry.isBorrowed)) {
+                return entry.slotId;
+            }
+        }
+        return -1;
+    }
+
     private Entry getSlotAt(int gridX, int gridY) {
         if (gridX < 0 || gridX >= gridWidth || gridY < 0 || gridY >= gridHeight) {
             return null;
@@ -225,6 +346,108 @@ public class CoinSlotGroup {
             return null;
         }
         return slots.get(index);
+    }
+
+    public boolean splitUnConnected(List<CoinSlotGroup> splitted) {
+
+        boolean[][] visitedColl = new boolean[gridWidth][gridHeight];
+
+        UnionFind unionFind = new UnionFind(slots.size());
+
+
+        for (int i = 0; i < gridHeight; i++) {
+            for (int j = 0; j < gridWidth; j++) {
+                if (visitedColl[j][i]) {
+                    continue;
+                }
+                if (!hasSlot(j, i)) {
+                    continue;
+                }
+
+                int slotIndex1 = slotGrid[j + i * gridWidth];
+
+                // check for neighbors
+
+                CoinSlotGroup.Neighbour[] its = new CoinSlotGroup.Neighbour[]{
+                        CoinSlotGroup.Neighbour.RIGHT,
+                        CoinSlotGroup.Neighbour.DOWN,
+                        CoinSlotGroup.Neighbour.DOWN_RIGHT,
+                };
+
+
+                for (CoinSlotGroup.Neighbour nei : its) {
+                    if (getNeighbourKind(j, i, nei) == CoinSlotGroup.NeighborKind.Slot_Owned) {
+                        int x = j;
+                        int y = i;
+                        switch (nei) {
+                            case RIGHT -> x++;
+                            case DOWN -> y++;
+                            case DOWN_RIGHT -> {
+                                x++;
+                                y++;
+                            }
+                        }
+                        visitedColl[x][y] = true;
+                        int slotIndex2 = slotGrid[x + y * gridWidth];
+                        unionFind.union(slotIndex1, slotIndex2);
+                    }
+                }
+            }
+        }
+
+        Int2ObjectOpenHashMap<IntList> groupMap = new Int2ObjectOpenHashMap<>();
+        for (int i = 0; i < slots.size(); i++) {
+            int g = unionFind.find(i);
+            groupMap.computeIfAbsent(g, it -> new IntArrayList()).add(i);
+        }
+
+        if (groupMap.size() <= 1) {
+            return false;
+        }
+        this.discardGroup();
+        for (IntList list : groupMap.values()) {
+            CoinSlotGroup newGroup = new CoinSlotGroup();
+            newGroup.groupX = this.groupX;
+            newGroup.groupY = this.groupY;
+            newGroup.beginUpdate();
+            for (int i = 0; i < list.size(); i++) {
+                int slotIndex = list.getInt(i);
+                int slotId = slots.get(slotIndex).slotId;
+                newGroup.takeSlot(slotId, this);
+            }
+            newGroup.endUpdate();
+
+            splitted.add(newGroup);
+        }
+
+        return true;
+
+    }
+
+
+    private boolean isAdsorptionSlot(int slotX, int slotY) {
+        Entry entry = getSlotAt(slotX, slotY);
+        if (entry != null && !entry.isBorrowed) {
+            return true;
+        }
+
+        for (int i = -1; i <= 1; i++) {
+            for (int j = -1; j <= 1; j++) {
+                if (i == 0 && j == 0) {
+                    continue;
+                }
+
+
+                entry = getSlotAt(slotX + i, slotY + j);
+                if (entry != null && !entry.isBorrowed) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+
+
     }
 
     public NeighborKind getNeighbourKind(int slotX, int slotY, Neighbour neighbour) {
@@ -243,7 +466,11 @@ public class CoinSlotGroup {
             return NeighborKind.Empty;
         }
 
-        return NeighborKind.Slot;
+        if (entry.isBorrowed) {
+            return NeighborKind.Slot_Borrowed;
+        }
+
+        return NeighborKind.Slot_Owned;
     }
 
 

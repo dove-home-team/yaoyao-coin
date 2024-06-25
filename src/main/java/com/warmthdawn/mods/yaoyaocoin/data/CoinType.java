@@ -6,10 +6,13 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.Objects;
+
 public record CoinType(
         int id,
         String name,
         int money,
+        int convertGroup,
         int maxStackSize,
         ResourceLocation itemName,
         Tag itemTag
@@ -20,7 +23,7 @@ public record CoinType(
             return false;
         }
 
-        if (stack.getItem().getRegistryName().equals(itemName)) {
+        if (Objects.equals(stack.getItem().getRegistryName(), itemName)) {
             return true;
         }
 
@@ -28,7 +31,7 @@ public record CoinType(
             return true;
         }
 
-        return stack.hasTag() && stack.getTag().equals(itemTag);
+        return stack.hasTag() && Objects.equals(stack.getTag(), itemTag);
     }
 
 

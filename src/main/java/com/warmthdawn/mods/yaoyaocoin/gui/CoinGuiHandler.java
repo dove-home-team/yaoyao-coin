@@ -43,6 +43,13 @@ public class CoinGuiHandler extends GuiComponent {
     private CoinSlot hoveringSlot = null;
     private CoinSlotGroup hoveringGroup = null;
 
+    private double draggingStartX = 0;
+    private double draggingStartY = 0;
+    private int prevDraggingX = 0;
+    private int prevDraggingY = 0;
+    private CoinSlotGroup draggingGroup = null;
+
+
     private void onMouseRelease(ScreenEvent.MouseReleasedEvent.Pre event) {
         if (event.getButton() == 0) {
             isLeftMouseDown = false;
@@ -51,6 +58,15 @@ public class CoinGuiHandler extends GuiComponent {
         if (ignoreMouseUp) {
             event.setCanceled(true);
             ignoreMouseUp = false;
+        }
+
+        if (draggingGroup != null) {
+            draggingGroup = null;
+            draggingStartX = 0;
+            draggingStartY = 0;
+            prevDraggingX = 0;
+            prevDraggingY = 0;
+            // TODO: finish dragging
         }
     }
 
@@ -77,6 +93,16 @@ public class CoinGuiHandler extends GuiComponent {
                 event.setCanceled(true);
             } else if (hoveringGroup != null) {
                 // Prevent click-through on the background and border of the slot
+                boolean isShiftHolding = Screen.hasShiftDown();
+                if (isShiftHolding) {
+                    draggingGroup = hoveringGroup;
+                    draggingStartX = mouseX;
+                    draggingStartY = mouseY;
+                    prevDraggingX = draggingGroup.getGroupX();
+                    prevDraggingY = draggingGroup.getGroupY();
+                }
+
+
                 event.setCanceled(true);
                 ignoreMouseUp = true;
             }
@@ -85,7 +111,24 @@ public class CoinGuiHandler extends GuiComponent {
 
 
     public void onInit(ScreenEvent.InitScreenEvent.Post event) {
-        layoutManager.init();
+        if (event.getScreen() instanceof AbstractContainerScreen<?> screen) {
+
+            layoutManager.init(screen);
+        }
+        else
+        {
+            layoutManager.clear();
+        }
+
+        this.draggingStartX = 0;
+        this.draggingStartY = 0;
+        this.prevDraggingX = 0;
+        this.prevDraggingY = 0;
+        this.draggingGroup = null;
+        this.hoveringSlot = null;
+        this.hoveringGroup = null;
+        this.isLeftMouseDown = false;
+        this.ignoreMouseUp = false;
     }
 
     public void onDrawBackground(ContainerScreenEvent.DrawBackground event) {
@@ -93,12 +136,6 @@ public class CoinGuiHandler extends GuiComponent {
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.setShaderTexture(0, GuiTextures.COIN_SLOT);
-
-//        for (int i = -1; i <= layoutManager.getGridHeight(); i++) {
-//            for (int j = -1; j <= layoutManager.getGridWidth(); j++) {
-//                drawSlot(event.getPoseStack(), x + j * 20, y + i * 20, j, i);
-//            }
-//        }
 
         for (CoinSlotGroup group : layoutManager.getGroups()) {
             int x0 = group.getGroupX();
@@ -112,12 +149,28 @@ public class CoinGuiHandler extends GuiComponent {
 
     }
 
+    private void handleDragging(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
+        if (draggingGroup == null) {
+            return;
+        }
+
+        double dx = mouseX - draggingStartX;
+        double dy = mouseY - draggingStartY;
+
+        int x0 = prevDraggingX;
+        int y0 = prevDraggingY;
+
+        layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy));
+    }
+
     public void onDrawForeground(ContainerScreenEvent.DrawForeground event) {
 
         int mouseX = event.getMouseX();
         int mouseY = event.getMouseY();
 
         AbstractContainerScreen<?> screen = event.getContainerScreen();
+
+        handleDragging(screen, mouseX, mouseY);
 
         PoseStack renderPoseStack = RenderSystem.getModelViewStack();
         renderPoseStack.pushPose();

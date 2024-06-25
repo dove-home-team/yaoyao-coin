@@ -23,9 +23,9 @@ public class CoinManager {
 
     public void init() {
 
-        this.coinTypes.add(new CoinType(0, "iron", 1, 9999, new ResourceLocation("minecraft", "iron_ingot"), null));
-        this.coinTypes.add(new CoinType(1, "gold", 3, 999, new ResourceLocation("minecraft", "gold_ingot"), null));
-        this.coinTypes.add(new CoinType(2, "diamond", 10, 100, new ResourceLocation("minecraft", "diamond"), null));
+        this.coinTypes.add(new CoinType(0, "iron", 1, 0, 9999, new ResourceLocation("minecraft", "iron_ingot"), null));
+        this.coinTypes.add(new CoinType(1, "gold", 3, 0, 999, new ResourceLocation("minecraft", "gold_ingot"), null));
+        this.coinTypes.add(new CoinType(2, "diamond", 10, 0, 100, new ResourceLocation("minecraft", "diamond"), null));
 
         coins = new int[coinTypes.size()];
         for (int i = 0; i < coins.length; i++) {

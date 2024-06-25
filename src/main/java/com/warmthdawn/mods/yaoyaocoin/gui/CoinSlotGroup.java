@@ -1,10 +1,11 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import org.apache.logging.log4j.util.TriConsumer;
+import net.minecraft.client.renderer.Rect2i;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class CoinSlotGroup {
 
@@ -30,6 +31,7 @@ public class CoinSlotGroup {
     public interface SlotConsumer {
         void accept(int x, int y, CoinSlot slot, boolean borrowed);
     }
+
     private final ArrayList<Entry> slots = new ArrayList<>();
 
     private final Int2IntOpenHashMap slotIdToIndex = new Int2IntOpenHashMap();
@@ -45,7 +47,12 @@ public class CoinSlotGroup {
 
     private int groupX = 0;
     private int groupY = 0;
+    private List<Rect2i> collisionRects = new ArrayList<>();
+    private boolean updating = false;
 
+    public List<Rect2i> getCollisionRects() {
+        return collisionRects;
+    }
 
 
     private void rebuildSlotGrid() {
@@ -53,7 +60,7 @@ public class CoinSlotGroup {
         int maxGridY = 0;
 
         for (Entry entry : slots) {
-            if(entry.isBorrowed) {
+            if (entry.isBorrowed) {
                 continue;
             }
             maxGridX = Math.max(maxGridX, entry.girdX);
@@ -77,11 +84,65 @@ public class CoinSlotGroup {
             slotIdToIndex.put(slots.get(i).slotId, i);
         }
 
+
+    }
+
+    private void computeCollisionRects() {
+        collisionRects.clear();
+        boolean[] visited = new boolean[slots.size()];
+
+        for (int i = 0; i < gridHeight; i++) {
+            for (int j = 0; j < gridWidth; j++) {
+                Entry entry = getSlotAt(j, i);
+                if (entry == null || entry.isBorrowed || visited[slotIdToIndex.get(entry.slotId)]) {
+                    continue;
+                }
+
+                int minX = j;
+                int minY = i;
+                int maxX = j;
+                int maxY = i;
+
+                for (int k = 0; k < gridHeight; k++) {
+                    for (int l = 0; l < gridWidth; l++) {
+                        Entry other = getSlotAt(l, k);
+                        if (other == null || other.isBorrowed || other.slotId != entry.slotId) {
+                            continue;
+                        }
+
+                        minX = Math.min(minX, l);
+                        minY = Math.min(minY, k);
+                        maxX = Math.max(maxX, l);
+                        maxY = Math.max(maxY, k);
+                        visited[slotIdToIndex.get(other.slotId)] = true;
+                    }
+                }
+
+                collisionRects.add(new Rect2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
+
+            }
+        }
     }
 
     public void addSlot(int gridX, int gridY, CoinSlot slot, boolean borrowed) {
         slots.add(new Entry(gridX, gridY, slot.getId(), borrowed));
+        if (updating) {
+            rebuildSlotGrid();
+
+            if (!borrowed) {
+                computeCollisionRects();
+            }
+        }
+    }
+
+    public void beginUpdate() {
+        updating = true;
+    }
+
+    public void endUpdate() {
+        updating = false;
         rebuildSlotGrid();
+        computeCollisionRects();
     }
 
 

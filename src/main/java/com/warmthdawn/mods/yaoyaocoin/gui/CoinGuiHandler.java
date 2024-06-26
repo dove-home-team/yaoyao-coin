@@ -11,6 +11,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.ItemRenderer;
@@ -50,8 +51,12 @@ public class CoinGuiHandler extends GuiComponent {
     private int prevDraggingY = 0;
     private CoinSlotGroup draggingGroup = null;
 
+    private boolean enabled = false;
 
     private void onMouseRelease(ScreenEvent.MouseReleasedEvent.Pre event) {
+        if (!enabled) {
+            return;
+        }
         if (event.getButton() == 0) {
             isLeftMouseDown = false;
         }
@@ -80,6 +85,9 @@ public class CoinGuiHandler extends GuiComponent {
     }
 
     private void onMouseClick(ScreenEvent.MouseClickedEvent.Pre event) {
+        if (!enabled) {
+            return;
+        }
         if (event.getButton() == 0) {
             isLeftMouseDown = true;
         }
@@ -134,13 +142,25 @@ public class CoinGuiHandler extends GuiComponent {
         }
     }
 
+    private boolean isSupportedScreen(AbstractContainerScreen<?> screen) {
+        // disable for creative inventory
+
+        if (screen instanceof CreativeModeInventoryScreen) {
+            return false;
+        }
+
+        return true;
+    }
+
 
     public void onInit(ScreenEvent.InitScreenEvent.Post event) {
-        if (event.getScreen() instanceof AbstractContainerScreen<?> screen) {
 
+        if (event.getScreen() instanceof AbstractContainerScreen<?> screen && isSupportedScreen(screen)) {
             layoutManager.init(screen);
+            enabled = true;
         } else {
             layoutManager.clear();
+            enabled = false;
         }
 
 
@@ -152,6 +172,9 @@ public class CoinGuiHandler extends GuiComponent {
     }
 
     public void onDrawBackground(ContainerScreenEvent.DrawBackground event) {
+        if (!enabled) {
+            return;
+        }
         // BindTexture
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
@@ -185,6 +208,9 @@ public class CoinGuiHandler extends GuiComponent {
 
     public void onDrawForeground(ContainerScreenEvent.DrawForeground event) {
 
+        if (!enabled) {
+            return;
+        }
         int mouseX = event.getMouseX();
         int mouseY = event.getMouseY();
 

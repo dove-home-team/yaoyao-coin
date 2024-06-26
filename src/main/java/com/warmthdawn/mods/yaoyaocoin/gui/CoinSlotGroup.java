@@ -1,5 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
+import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
@@ -8,13 +9,14 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class CoinSlotGroup {
-
+    private static final Logger logger = LogUtils.getLogger();
 
     public enum Neighbour {
         UP,
@@ -71,6 +73,44 @@ public class CoinSlotGroup {
         return adsorptionRects;
     }
 
+    private boolean needsRebuild = false;
+
+    private void setSlotGrid(int gridX, int gridY, int index) {
+        if (gridX < -1 || gridX > gridWidth || gridY < -1 || gridY > gridHeight) {
+            logger.error("Setting slot out of bounds! this is a bug!");
+            return;
+        }
+
+        if (index < 0 || index >= slots.size()) {
+            logger.error("slot index out of bounds! this is a bug!");
+            return;
+        }
+
+        Entry entry = slots.get(index);
+        if (entry == null) {
+            logger.error("Setting null slot! this is a bug!");
+            return;
+        }
+        if (!entry.isBorrowed) {
+            if (gridX < 0 || gridY < 0 || gridX >= gridWidth || gridY >= gridHeight) {
+                logger.error("Setting non-borrowed slot out of bounds! this is a bug!");
+                return;
+            }
+        }
+
+        if (entry.girdX != gridX || entry.gridY != gridY) {
+            logger.error("Setting slot to the wrong position! this is a bug!");
+            return;
+        }
+
+
+        slotGrid[(gridX + 1) + (gridY + 1) * (gridWidth + 2)] = index;
+    }
+
+    private int getSlotGrid(int gridX, int gridY) {
+        return slotGrid[(gridX + 1) + (gridY + 1) * (gridWidth + 2)];
+    }
+
 
     private void rebuildSlotGrid() {
         int maxGridX = Integer.MIN_VALUE;
@@ -79,6 +119,9 @@ public class CoinSlotGroup {
         int minGridY = Integer.MAX_VALUE;
 
         for (Entry entry : slots) {
+            if (entry.isBorrowed) {
+                continue;
+            }
             maxGridX = Math.max(maxGridX, entry.girdX);
             maxGridY = Math.max(maxGridY, entry.gridY);
             minGridX = Math.min(minGridX, entry.girdX);
@@ -88,9 +131,11 @@ public class CoinSlotGroup {
         gridWidth = maxGridX - minGridX + 1;
         gridHeight = maxGridY - minGridY + 1;
 
-        slotGrid = new int[gridHeight * gridWidth];
+        slotGrid = new int[(gridHeight + 2) * (gridWidth + 2)];
 
         Arrays.fill(slotGrid, -1);
+
+        List<Entry> invalidBorrowed = new ArrayList<>();
 
         for (int i = 0; i < slots.size(); i++) {
             Entry entry = slots.get(i);
@@ -100,7 +145,19 @@ public class CoinSlotGroup {
                 slots.set(i, entry);
             }
 
-            slotGrid[entry.girdX + entry.gridY * gridWidth] = i;
+            if (entry.isBorrowed) {
+                if (entry.girdX < -1 || entry.girdX > gridWidth || entry.gridY < -1 || entry.gridY > gridHeight) {
+                    invalidBorrowed.add(entry);
+                    logger.info("removing invalid borrowed slot since it is out of bounds");
+                    continue;
+                }
+
+            } else if (entry.girdX < 0 || entry.girdX >= gridWidth || entry.gridY < 0 || entry.gridY >= gridHeight) {
+                logger.error("Rebuilding slot group finds out of bounds slot! this is a bug!");
+                continue;
+            }
+
+            setSlotGrid(entry.girdX, entry.gridY, i);
         }
 
         if (minGridX != 0 || minGridY != 0) {
@@ -108,12 +165,16 @@ public class CoinSlotGroup {
             groupY += minGridY * 20;
         }
 
+        for (Entry entry : invalidBorrowed) {
+            slots.remove(entry);
+        }
+
         slotIdToIndex.clear();
         for (int i = 0; i < slots.size(); i++) {
             slotIdToIndex.put(slots.get(i).slotId, i);
         }
 
-
+        needsRebuild = false;
     }
 
     public Block createAdsorptionBlock(int gridSize, Vector2i offset) {
@@ -217,11 +278,21 @@ public class CoinSlotGroup {
         slots.add(new Entry(gridX, gridY, slot.getId(), borrowed));
         if (!updating) {
             rebuildSlotGrid();
-
-            if (!borrowed) {
-                computeCollisionRects();
-            }
+            computeCollisionRects();
+        } else {
+            needsRebuild = true;
         }
+    }
+
+    private void addSlotInternalUnsafe(int gridX, int gridY, CoinSlot slot, boolean borrowed) {
+        if (gridX < -1 || gridX > gridWidth || gridY < -1 || gridY > gridHeight) {
+            logger.error("Adding slot out of bounds! this is a bug!");
+            return;
+        }
+        int newIndex = slots.size();
+        slots.add(new Entry(gridX, gridY, slot.getId(), borrowed));
+        setSlotGrid(gridX, gridY, newIndex);
+        slotIdToIndex.put(slot.getId(), newIndex);
     }
 
     public void discardGroup() {
@@ -240,6 +311,8 @@ public class CoinSlotGroup {
         if (!updating) {
             rebuildSlotGrid();
             computeCollisionRects();
+        } else {
+            needsRebuild = true;
         }
     }
 
@@ -252,6 +325,8 @@ public class CoinSlotGroup {
         if (!updating) {
             rebuildSlotGrid();
             computeCollisionRects();
+        } else {
+            needsRebuild = true;
         }
     }
 
@@ -260,6 +335,7 @@ public class CoinSlotGroup {
         int yOff = groupB.groupY - groupY;
         xOff = (int) Math.floor(1.0 * xOff / slotSize);
         yOff = (int) Math.floor(1.0 * yOff / slotSize);
+
         for (Entry entry : groupB.slots) {
             if (entry.isBorrowed) {
                 continue;
@@ -267,7 +343,7 @@ public class CoinSlotGroup {
             int slotX = entry.girdX + xOff;
             int slotY = entry.gridY + yOff;
 
-            if (slotX < -1 || slotX >= gridWidth || slotY < -1 || slotY >= gridHeight) {
+            if (slotX < -1 || slotX > gridWidth || slotY < -1 || slotY > gridHeight) {
                 continue;
             }
 
@@ -276,19 +352,20 @@ public class CoinSlotGroup {
             }
 
             boolean adsorb = false;
-            for(Rectangle2i rect : adsorptionRects) {
-                if(rect.contains(new Vector2i(slotX, slotY))) {
+            for (Rectangle2i rect : adsorptionRects) {
+                if (rect.contains(new Vector2i(slotX, slotY))) {
                     adsorb = true;
                     break;
                 }
             }
 
-            if(!adsorb) {
+            if (!adsorb) {
                 continue;
             }
 
-            this.addSlot(slotX, slotY, ClientCoinStorage.INSTANCE.getSlots().get(entry.slotId), true);
+            this.addSlotInternalUnsafe(slotX, slotY, ClientCoinStorage.INSTANCE.getSlots().get(entry.slotId), true);
         }
+
     }
 
     public void takeSlot(int slotId, CoinSlotGroup other) {
@@ -304,6 +381,8 @@ public class CoinSlotGroup {
         if (!updating) {
             rebuildSlotGrid();
             computeCollisionRects();
+        } else {
+            needsRebuild = true;
         }
     }
 
@@ -322,7 +401,7 @@ public class CoinSlotGroup {
         if (gridX < 0 || gridX >= gridWidth || gridY < 0 || gridY >= gridHeight) {
             return -1;
         }
-        int index = slotGrid[gridX + gridY * gridWidth];
+        int index = getSlotGrid(gridX, gridY);
         if (index == -1) {
             return -1;
         }
@@ -330,15 +409,21 @@ public class CoinSlotGroup {
     }
 
     public boolean hasSlot(int gridX, int gridY) {
+        return hasSlot(gridX, gridY, true);
+    }
+
+    public boolean hasSlot(int gridX, int gridY, boolean ignoreBorrowed) {
         Entry entry = getSlotAt(gridX, gridY);
 
         if (entry == null) {
             return false;
         }
+        if (ignoreBorrowed) {
+            return !entry.isBorrowed;
+        }
 
-        return !entry.isBorrowed;
+        return true;
     }
-
 
     public int getSlotX(int slotId) {
         int slotIndex = slotIdToIndex.getOrDefault(slotId, -1);
@@ -399,14 +484,30 @@ public class CoinSlotGroup {
     }
 
     private Entry getSlotAt(int gridX, int gridY) {
-        if (gridX < 0 || gridX >= gridWidth || gridY < 0 || gridY >= gridHeight) {
+        if (needsRebuild) {
+            logger.error("Accessing slot group without rebuilding slot grid! this is a bug!");
+            rebuildSlotGrid();
+        }
+        if (gridX < -1 || gridX > gridWidth || gridY < -1 || gridY > gridHeight) {
             return null;
         }
-        int index = slotGrid[gridX + gridY * gridWidth];
+        int index = getSlotGrid(gridX, gridY);
         if (index == -1 || index >= slots.size()) {
             return null;
         }
-        return slots.get(index);
+        Entry entry = slots.get(index);
+
+        if (gridX < 0 || gridY < 0 || gridX >= gridWidth || gridY >= gridHeight) {
+            if (entry == null || entry.isBorrowed) {
+                return entry;
+            }
+
+            logger.error("Accessing slot group out of bounds! this is a bug!");
+            return null;
+        }
+
+        return entry;
+
     }
 
     public boolean splitUnConnected(List<CoinSlotGroup> splitted) {
@@ -425,7 +526,7 @@ public class CoinSlotGroup {
                     continue;
                 }
 
-                int slotIndex1 = slotGrid[j + i * gridWidth];
+                int slotIndex1 = getSlotGrid(j, i);
 
                 // check for neighbors
 
@@ -449,7 +550,7 @@ public class CoinSlotGroup {
                             }
                         }
                         visitedColl[x][y] = true;
-                        int slotIndex2 = slotGrid[x + y * gridWidth];
+                        int slotIndex2 = getSlotGrid(x, y);
                         unionFind.union(slotIndex1, slotIndex2);
                     }
                 }

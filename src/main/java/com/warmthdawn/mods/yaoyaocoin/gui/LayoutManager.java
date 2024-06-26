@@ -172,9 +172,7 @@ public class LayoutManager {
         group.setGroupX(newX);
         group.setGroupY(newY);
 
-        if (nearestOffset != null) {
-            computeGroupOverlap(true);
-        }
+        computeGroupOverlap(true);
 
     }
 
@@ -184,8 +182,8 @@ public class LayoutManager {
 
         for (CoinSlotGroup group : groups) {
             Vector2i offset = group.getOffset();
-            offset.setX(offset.getX() % SLOT_SIZE);
-            offset.setY(offset.getY() % SLOT_SIZE);
+            offset.setX((offset.getX() % SLOT_SIZE + SLOT_SIZE) % SLOT_SIZE);
+            offset.setY((offset.getY() % SLOT_SIZE + SLOT_SIZE) % SLOT_SIZE);
 
             ArrayList<CoinSlotGroup> list = groupMap.computeIfAbsent(offset, k -> new ArrayList<>());
             list.add(group);
@@ -196,12 +194,12 @@ public class LayoutManager {
                 continue;
             }
             if (borrow) {
-                for(int i = 0; i < list.size(); i++) {
+                for (int i = 0; i < list.size(); i++) {
                     CoinSlotGroup groupA = list.get(i);
-                    groupA.beginUpdate();
                     groupA.clearBorrowedSlots();
-                    for(int j = 0; j < list.size(); j++) {
-                        if(i == j) {
+                    groupA.beginUpdate();
+                    for (int j = 0; j < list.size(); j++) {
+                        if (i == j) {
                             continue;
                         }
                         CoinSlotGroup groupB = list.get(j);
@@ -228,6 +226,9 @@ public class LayoutManager {
     }
 
     public CoinSlotGroup takeSlot(int slotId, CoinSlotGroup group) {
+        if (group.isSingle()) {
+            return group;
+        }
         CoinSlotGroup newGroup = new CoinSlotGroup();
         newGroup.setGroupX(group.getGroupX());
         newGroup.setGroupY(group.getGroupY());

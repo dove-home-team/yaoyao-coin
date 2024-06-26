@@ -371,21 +371,25 @@ public class CoinGuiHandler extends GuiComponent {
             return;
         }
 
+        if (group.hasSlot(slotX, slotY, false)) {
+            return;
+        }
+
         // top left
         CoinSlotGroup.NeighborKind up = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP);
         CoinSlotGroup.NeighborKind left = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.LEFT);
         CoinSlotGroup.NeighborKind upLeft = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP_LEFT);
 
-        if (up != CoinSlotGroup.NeighborKind.Empty) {
+        if (up == CoinSlotGroup.NeighborKind.Slot_Owned) {
 
-            if (left != CoinSlotGroup.NeighborKind.Empty) {
+            if (left == CoinSlotGroup.NeighborKind.Slot_Owned) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_LEFT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
             }
-        } else if (left != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (left == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
-        } else if (upLeft != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (upLeft == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_LEFT_1);
         }
 
@@ -395,15 +399,17 @@ public class CoinGuiHandler extends GuiComponent {
         CoinSlotGroup.NeighborKind upRight = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP_RIGHT);
         CoinSlotGroup.NeighborKind right = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.RIGHT);
 
-        if (up != CoinSlotGroup.NeighborKind.Empty) {
-            if (right != CoinSlotGroup.NeighborKind.Empty) {
+
+        if (up == CoinSlotGroup.NeighborKind.Slot_Owned) {
+            if (right == CoinSlotGroup.NeighborKind.Slot_Owned) {
+                // top has slot and right has slot
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_RIGHT_3);
-            } else {
+            } else if (right != CoinSlotGroup.NeighborKind.Empty) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
             }
-        } else if (right != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (right == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
-        } else if (upRight != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (upRight == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_RIGHT_1);
         }
 
@@ -414,15 +420,15 @@ public class CoinGuiHandler extends GuiComponent {
         CoinSlotGroup.NeighborKind down = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN);
         CoinSlotGroup.NeighborKind bottomLeft = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN_LEFT);
 
-        if (down != CoinSlotGroup.NeighborKind.Empty) {
-            if (left != CoinSlotGroup.NeighborKind.Empty) {
+        if (down == CoinSlotGroup.NeighborKind.Slot_Owned) {
+            if (left == CoinSlotGroup.NeighborKind.Slot_Owned) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_LEFT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
             }
-        } else if (left != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (left == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
-        } else if (bottomLeft != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (bottomLeft == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_LEFT_1);
         }
 
@@ -432,15 +438,15 @@ public class CoinGuiHandler extends GuiComponent {
         y = y0 + 10;
         CoinSlotGroup.NeighborKind bottomRight = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN_RIGHT);
 
-        if (down != CoinSlotGroup.NeighborKind.Empty) {
-            if (right != CoinSlotGroup.NeighborKind.Empty) {
+        if (down == CoinSlotGroup.NeighborKind.Slot_Owned) {
+            if (right == CoinSlotGroup.NeighborKind.Slot_Owned) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_RIGHT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
             }
-        } else if (right != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (right == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
-        } else if (bottomRight != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (bottomRight == CoinSlotGroup.NeighborKind.Slot_Owned) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_RIGHT_1);
         }
 

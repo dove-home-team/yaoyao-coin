@@ -1,11 +1,13 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
+import com.warmthdawn.mods.yaoyaocoin.misc.Block;
+import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
+import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import net.minecraft.client.renderer.Rect2i;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,10 +15,6 @@ import java.util.List;
 
 public class CoinSlotGroup {
 
-
-    public boolean isSingle() {
-        return slots.size() == 1;
-    }
 
     public enum Neighbour {
         UP,
@@ -60,13 +58,17 @@ public class CoinSlotGroup {
 
     private int groupX = 0;
     private int groupY = 0;
-    private final List<Rect2i> collisionRects = new ArrayList<>();
-    private final List<Rect2i> adsorptionRects = new ArrayList<>();
+    private final List<Rectangle2i> collisionRects = new ArrayList<>();
+    private final List<Rectangle2i> adsorptionRects = new ArrayList<>();
     private boolean updating = false;
     private boolean discard = false;
 
-    public List<Rect2i> getCollisionRects() {
+    public List<Rectangle2i> getCollisionRects() {
         return collisionRects;
+    }
+
+    public List<Rectangle2i> getAdsorptionRects() {
+        return adsorptionRects;
     }
 
 
@@ -77,9 +79,6 @@ public class CoinSlotGroup {
         int minGridY = Integer.MAX_VALUE;
 
         for (Entry entry : slots) {
-            if (entry.isBorrowed) {
-                continue;
-            }
             maxGridX = Math.max(maxGridX, entry.girdX);
             maxGridY = Math.max(maxGridY, entry.gridY);
             minGridX = Math.min(minGridX, entry.girdX);
@@ -96,7 +95,7 @@ public class CoinSlotGroup {
         for (int i = 0; i < slots.size(); i++) {
             Entry entry = slots.get(i);
 
-            if(minGridX != 0 || minGridY != 0){
+            if (minGridX != 0 || minGridY != 0) {
                 entry = new Entry(entry.girdX - minGridX, entry.gridY - minGridY, entry.slotId, entry.isBorrowed);
                 slots.set(i, entry);
             }
@@ -104,7 +103,7 @@ public class CoinSlotGroup {
             slotGrid[entry.girdX + entry.gridY * gridWidth] = i;
         }
 
-        if(minGridX != 0 || minGridY != 0){
+        if (minGridX != 0 || minGridY != 0) {
             groupX += minGridX * 20;
             groupY += minGridY * 20;
         }
@@ -115,6 +114,20 @@ public class CoinSlotGroup {
         }
 
 
+    }
+
+    public Block createAdsorptionBlock(int gridSize, Vector2i offset) {
+        boolean[][] matrix = new boolean[gridWidth][gridHeight];
+        for (int i = 0; i < gridHeight; i++) {
+            for (int j = 0; j < gridWidth; j++) {
+                matrix[j][i] = hasSlot(j, i);
+            }
+        }
+        return new Block(matrix, (int) Math.floor(1.0 * offset.getX() / gridSize), (int) Math.floor(1.0 * offset.getY() / gridSize));
+    }
+
+    public Vector2i getOffset() {
+        return new Vector2i(groupX, groupY);
     }
 
     private void computeCollisionRects() {
@@ -152,7 +165,7 @@ public class CoinSlotGroup {
                         visitedColl[k][l] = true;
                     }
                 }
-                collisionRects.add(new Rect2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
+                collisionRects.add(new Rectangle2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
 
             }
         }
@@ -195,7 +208,7 @@ public class CoinSlotGroup {
                     }
                 }
 
-                adsorptionRects.add(new Rect2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
+                adsorptionRects.add(new Rectangle2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
             }
         }
     }
@@ -227,6 +240,54 @@ public class CoinSlotGroup {
         if (!updating) {
             rebuildSlotGrid();
             computeCollisionRects();
+        }
+    }
+
+    public boolean isSingle() {
+        return slots.size() == 1;
+    }
+
+    public void clearBorrowedSlots() {
+        slots.removeIf(Entry::isBorrowed);
+        if (!updating) {
+            rebuildSlotGrid();
+            computeCollisionRects();
+        }
+    }
+
+    public void borrowSlots(CoinSlotGroup groupB, int slotSize) {
+        int xOff = groupB.groupX - groupX;
+        int yOff = groupB.groupY - groupY;
+        xOff = (int) Math.floor(1.0 * xOff / slotSize);
+        yOff = (int) Math.floor(1.0 * yOff / slotSize);
+        for (Entry entry : groupB.slots) {
+            if (entry.isBorrowed) {
+                continue;
+            }
+            int slotX = entry.girdX + xOff;
+            int slotY = entry.gridY + yOff;
+
+            if (slotX < -1 || slotX >= gridWidth || slotY < -1 || slotY >= gridHeight) {
+                continue;
+            }
+
+            if (hasSlot(slotX, slotY)) {
+                continue;
+            }
+
+            boolean adsorb = false;
+            for(Rectangle2i rect : adsorptionRects) {
+                if(rect.contains(new Vector2i(slotX, slotY))) {
+                    adsorb = true;
+                    break;
+                }
+            }
+
+            if(!adsorb) {
+                continue;
+            }
+
+            this.addSlot(slotX, slotY, ClientCoinStorage.INSTANCE.getSlots().get(entry.slotId), true);
         }
     }
 
@@ -342,7 +403,7 @@ public class CoinSlotGroup {
             return null;
         }
         int index = slotGrid[gridX + gridY * gridWidth];
-        if (index == -1) {
+        if (index == -1 || index >= slots.size()) {
             return null;
         }
         return slots.get(index);

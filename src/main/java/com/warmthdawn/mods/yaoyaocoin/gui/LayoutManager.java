@@ -3,16 +3,15 @@ package com.warmthdawn.mods.yaoyaocoin.gui;
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
-import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
+import com.warmthdawn.mods.yaoyaocoin.misc.Block;
+import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
+import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.Rect2i;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class LayoutManager {
@@ -48,75 +47,180 @@ public class LayoutManager {
         int newY = y;
         // collisions to center rect
 
-        int screenX0 = screen.getGuiLeft();
-        int screenY0 = screen.getGuiTop();
+//        int screenX0 = screen.getGuiLeft();
+//        int screenY0 = screen.getGuiTop();
+//
+//        int screenX1 = screenX0 + screen.getXSize();
+//        int screenY1 = screenY0 + screen.getYSize();
 
-        int screenX1 = screenX0 + screen.getXSize();
-        int screenY1 = screenY0 + screen.getYSize();
+        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
+
 
         // 计算碰撞
-        for (Rect2i rect : group.getCollisionRects()) {
+        for (Rectangle2i rect : group.getCollisionRects()) {
             // check if collisionRects is inside screen rect
 
-            int rectX0 = rect.getX() * SLOT_SIZE;
-            int rectY0 = rect.getY() * SLOT_SIZE;
+            Rectangle2i rectActual = rect.scaled(SLOT_SIZE);
 
-            int rectWidth = rect.getWidth() * SLOT_SIZE;
-            int rectHeight = rect.getHeight() * SLOT_SIZE;
+            if (!screenRect.intersects(rectActual.translated(new Vector2i(newX, newY)))) {
+                continue;
+            }
 
-            boolean xInside = newX + rectX0 + rectWidth > screenX0 &&
-                    newX + rectX0 < screenX1;
+            int xLeft = screenRect.getX() - rectActual.getWidth() - rectActual.getX();
+            int xRight = screenRect.getX() + screenRect.getWidth() - rectActual.getX();
 
-            boolean yInside = newY + rectY0 + rectHeight > screenY0 &&
-                    newY + rectY0 < screenY1;
+            int yTop = screenRect.getY() - rectActual.getHeight() - rectActual.getY();
+            int yBottom = screenRect.getY() + screenRect.getHeight() - rectActual.getY();
+
+            int stoppedX;
+            if (Math.abs(newX - xLeft) < Math.abs(newX - xRight)) {
+                stoppedX = xLeft;
+            } else {
+                stoppedX = xRight;
+            }
+
+            int stoppedY;
+            if (Math.abs(newY - yTop) < Math.abs(newY - yBottom)) {
+                stoppedY = yTop;
+            } else {
+                stoppedY = yBottom;
+            }
 
 
-            if (xInside && yInside) {
+            // 停在最近的边界
+            if (Math.abs(newX - stoppedX) < Math.abs(newY - stoppedY)) {
+                newX = stoppedX;
+            } else {
+                newY = stoppedY;
+            }
+        }
 
-                int xLeft = screenX0 - rectWidth - rectX0;
-                int xRight = screenX1 - rectX0;
-                int yTop = screenY0 - rectHeight - rectY0;
-                int yBottom = screenY1 - rectY0;
 
-                int stoppedX;
-                if (Math.abs(newX - xLeft) < Math.abs(newX - xRight)) {
-                    stoppedX = xLeft;
-                } else {
-                    stoppedX = xRight;
+        // 计算吸附
+
+
+        // 查找最近的吸附组
+
+
+        List<Rectangle2i> collisionRects = new ArrayList<>(group.getCollisionRects().size());
+
+        Vector2i newPos = new Vector2i(newX, newY);
+        for (Rectangle2i rect : group.getCollisionRects()) {
+            Rectangle2i actual = rect.scaled(SLOT_SIZE).translateInPlace(newPos);
+            collisionRects.add(actual);
+        }
+
+
+        Vector2i nearestOffset = null;
+        Vector2i finalNewPos = null;
+        for (CoinSlotGroup otherGroup : this.groups) {
+            if (otherGroup == group) {
+                continue;
+            }
+            boolean willAdsorb = false;
+            for (Rectangle2i adRect : otherGroup.getAdsorptionRects()) {
+                Rectangle2i adRectActual = adRect.scaled(SLOT_SIZE).translateInPlace(new Vector2i(otherGroup.getGroupX(), otherGroup.getGroupY()));
+                for (Rectangle2i currentCollision : collisionRects) {
+                    if (adRectActual.intersects(currentCollision)) {
+                        willAdsorb = true;
+                        break;
+                    }
                 }
-                int stoppedY;
-                if (Math.abs(newY - yTop) < Math.abs(newY - yBottom)) {
-                    stoppedY = yTop;
-                } else {
-                    stoppedY = yBottom;
-                }
+            }
 
-                // 停在最近的边界
-                if (Math.abs(newX - stoppedX) < Math.abs(newY - stoppedY)) {
-                    newX = stoppedX;
-                } else {
-                    newY = stoppedY;
+            if (!willAdsorb) {
+                continue;
+            }
+            Vector2i otherOffset = otherGroup.getOffset();
+
+            Block otherBlock = otherGroup.createAdsorptionBlock(SLOT_SIZE, Vector2i.ZERO);
+            Block currentBlock = group.createAdsorptionBlock(SLOT_SIZE, newPos.subtract(otherOffset));
+
+            Vector2i offset = Block.moveBlocks(currentBlock, otherBlock);
+
+            if (offset == null) {
+                continue;
+            }
+
+            if (nearestOffset == null || offset.lengthManhattan() < nearestOffset.lengthManhattan()) {
+                Vector2i pos = otherOffset.add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
+
+                boolean valid = true;
+                for (Rectangle2i rect : group.getCollisionRects()) {
+                    Rectangle2i actual = rect.scaled(SLOT_SIZE).translateInPlace(pos);
+
+                    if (!screenRect.intersects(actual)) {
+                        continue;
+                    }
+                    valid = false;
+
+                }
+                if (valid) {
+                    nearestOffset = offset;
+                    finalNewPos = pos;
                 }
 
             }
         }
 
-        // 计算吸附
+        if (nearestOffset != null) {
+            newX = finalNewPos.getX();
+            newY = finalNewPos.getY();
+        }
 
 
         group.setGroupX(newX);
         group.setGroupY(newY);
 
+        if (nearestOffset != null) {
+            computeGroupOverlap(true);
+        }
 
     }
 
-    private void rebuildGroupIndex(){
+
+    private void computeGroupOverlap(boolean borrow) {
+        HashMap<Vector2i, ArrayList<CoinSlotGroup>> groupMap = new HashMap<>();
+
+        for (CoinSlotGroup group : groups) {
+            Vector2i offset = group.getOffset();
+            offset.setX(offset.getX() % SLOT_SIZE);
+            offset.setY(offset.getY() % SLOT_SIZE);
+
+            ArrayList<CoinSlotGroup> list = groupMap.computeIfAbsent(offset, k -> new ArrayList<>());
+            list.add(group);
+        }
+
+        for (ArrayList<CoinSlotGroup> list : groupMap.values()) {
+            if (list.isEmpty()) {
+                continue;
+            }
+            if (borrow) {
+                for(int i = 0; i < list.size(); i++) {
+                    CoinSlotGroup groupA = list.get(i);
+                    groupA.beginUpdate();
+                    groupA.clearBorrowedSlots();
+                    for(int j = 0; j < list.size(); j++) {
+                        if(i == j) {
+                            continue;
+                        }
+                        CoinSlotGroup groupB = list.get(j);
+                        groupA.borrowSlots(groupB, SLOT_SIZE);
+                    }
+                    groupA.endUpdate();
+                }
+            }
+        }
+    }
+
+
+    private void rebuildGroupIndex() {
         slotIdToGroupIndex.clear();
         for (int i = 0; i < groups.size(); i++) {
             CoinSlotGroup group = groups.get(i);
             final int groupIndex = i;
             group.iterateSlots((slotX, slotY, slot, borrowed) -> {
-                if(!borrowed){
+                if (!borrowed) {
                     slotIdToGroupIndex.put(slot.getId(), groupIndex);
                 }
             });
@@ -139,7 +243,7 @@ public class LayoutManager {
         ArrayList<CoinSlotGroup> splitted = new ArrayList<>();
         boolean doSplit = group.splitUnConnected(splitted);
 
-        if(!doSplit){
+        if (!doSplit) {
             return;
         }
 

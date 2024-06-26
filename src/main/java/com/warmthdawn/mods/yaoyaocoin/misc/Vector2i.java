@@ -64,4 +64,8 @@ public class Vector2i {
         y *= slotSize;
         return this;
     }
+
+    public Vector2i divide(int i) {
+        return new Vector2i(x / i, y / i);
+    }
 }

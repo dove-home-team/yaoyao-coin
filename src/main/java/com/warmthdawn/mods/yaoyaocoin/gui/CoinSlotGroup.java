@@ -1,22 +1,26 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.logging.LogUtils;
+import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
 import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.ints.*;
 import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class CoinSlotGroup {
     private static final Logger logger = LogUtils.getLogger();
+
+    public boolean isDiscard() {
+        return discard;
+    }
+
+    public boolean empty() {
+        return slots.isEmpty();
+    }
 
     public enum Neighbour {
         UP,
@@ -507,6 +511,143 @@ public class CoinSlotGroup {
         }
 
         return entry;
+
+    }
+
+    public static boolean combineGroups(List<CoinSlotGroup> groups, int slotSize) {
+
+        HashMap<Vector2i, Integer> slotMap = new HashMap<>();
+        CoinManager manager = CoinManager.getInstance();
+        int[] slotGroupMap = new int[manager.getCoinTypeCount()];
+        Arrays.fill(slotGroupMap, -1);
+
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+
+        for (int i = 0; i < groups.size(); i++) {
+            CoinSlotGroup group = groups.get(i);
+            minX = Math.min(minX, group.groupX);
+            minY = Math.min(minY, group.groupY);
+
+            for (Entry entry : group.slots) {
+                if (entry.isBorrowed) {
+                    continue;
+                }
+                slotGroupMap[entry.slotId] = i;
+            }
+        }
+
+        UnionFind unionFind = new UnionFind(groups.size());
+
+        int xStart = Integer.MAX_VALUE;
+        int yStart = Integer.MAX_VALUE;
+        int xEnd = Integer.MIN_VALUE;
+        int yEnd = Integer.MIN_VALUE;
+
+//        for (CoinSlotGroup group : groups) {
+        for (int i = 0; i < groups.size(); i++) {
+            CoinSlotGroup group = groups.get(i);
+            int xOff = (group.groupX - minX) / slotSize;
+            int yOff = (group.groupY - minY) / slotSize;
+
+            for (Entry entry : group.slots) {
+                if (entry.isBorrowed) {
+                    continue;
+                }
+
+                Vector2i pos = new Vector2i(entry.girdX + xOff, entry.gridY + yOff);
+                xStart = Math.min(xStart, pos.getX());
+                yStart = Math.min(yStart, pos.getY());
+                xEnd = Math.max(xEnd, pos.getX());
+                yEnd = Math.max(yEnd, pos.getY());
+
+                if (slotMap.containsKey(pos)) {
+                    int slotId = slotMap.get(pos);
+                    int otherGroup = slotGroupMap[slotId];
+                    unionFind.union(otherGroup, i);
+                } else {
+                    slotMap.put(pos, entry.slotId);
+                }
+            }
+        }
+
+
+        // 在 3x3 的窗口内进行卷积，合并相邻的 slot
+
+        int windowSize = 3;
+        for (int i = yStart; i <= yEnd + 1; i++) {
+            for (int j = xStart; j <= xEnd + 1; j++) {
+                HashSet<Integer> groupSet = new HashSet<>();
+                for (int k = 0; k < windowSize; k++) {
+                    for (int l = 0; l < windowSize; l++) {
+                        Vector2i pos = new Vector2i(j + l, i + k);
+                        if (slotMap.containsKey(pos)) {
+                            int slotId = slotMap.get(pos);
+                            int groupId = slotGroupMap[slotId];
+                            if (groupId != -1) {
+                                groupSet.add(groupId);
+                            }
+                        }
+                    }
+                }
+
+                int[] groupArray = groupSet.stream().mapToInt(Integer::intValue).toArray();
+
+                for (int k = 0; k < groupArray.length; k++) {
+                    for (int l = k + 1; l < groupArray.length; l++) {
+                        unionFind.union(groupArray[k], groupArray[l]);
+                    }
+                }
+            }
+        }
+
+
+        Int2ObjectOpenHashMap<List<CoinSlotGroup>> groupMap = new Int2ObjectOpenHashMap<>();
+        for(int i = 0; i < groups.size(); i++) {
+            int g = unionFind.find(i);
+            groupMap.computeIfAbsent(g, it -> new ArrayList<>()).add(groups.get(i));
+        }
+
+        boolean modified = false;
+
+        for (Int2ObjectMap.Entry<List<CoinSlotGroup>> entry : groupMap.int2ObjectEntrySet()) {
+            List<CoinSlotGroup> list = entry.getValue();
+            if (list.size() <= 1) {
+                continue;
+            }
+
+            CoinSlotGroup first = list.get(0);
+
+            if (first == null) {
+                logger.error("slot group not found! this is a bug!");
+                continue;
+            }
+            modified = true;
+
+            first.beginUpdate();
+            for (int i = 1; i < list.size(); i++) {
+                CoinSlotGroup other = list.get(i);
+                if (other == null || other == first) {
+                    continue;
+                }
+                int xOff = (other.groupX - first.groupX) / slotSize;
+                int yOff = (other.groupY - first.groupY) / slotSize;
+                for (Entry otherEntry : other.slots) {
+                    if (otherEntry.isBorrowed) {
+                        continue;
+                    }
+
+                    Entry newEntry = new Entry(otherEntry.girdX + xOff, otherEntry.gridY + yOff, otherEntry.slotId, false);
+                    first.slots.add(newEntry);
+                }
+                other.discardGroup();
+            }
+            first.endUpdate();
+
+        }
+
+        return modified;
+
 
     }
 

@@ -35,10 +35,96 @@ public class LayoutManager {
         slotIdToGroupIndex.clear();
     }
 
-    public void finishMovement() {
+    public void finishMovement(AbstractContainerScreen<?> screen) {
+        computeGroupOverlap(false);
         CoinSaveState saveState = CoinSaveState.instance();
+        CoinManager manager = CoinManager.getInstance();
 
+        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
 
+        saveState.clear();
+        int id = 0;
+        for (CoinSlotGroup group : groups) {
+            CoinSaveState.Group saveGroup = new CoinSaveState.Group();
+            int groupId = id++;
+            saveGroup.id = groupId;
+
+            group.iterateSlots((slotX, slotY, slot, borrowed) -> {
+                if (borrowed) {
+                    return;
+                }
+
+                CoinSaveState.Slot saveSlot = new CoinSaveState.Slot();
+                saveSlot.x = slotX;
+                saveSlot.y = slotY;
+                saveSlot.name = manager.getCoinType(slot.getId()).name();
+                saveSlot.groupId = groupId;
+
+                saveState.addSlot(saveSlot);
+
+            });
+            Rectangle2i groupRect = new Rectangle2i(group.getGroupX(), group.getGroupY(), group.getGridWidth() * SLOT_SIZE, group.getGridHeight() * SLOT_SIZE);
+
+            // top left
+            if (groupRect.getX1() < screenRect.getX() && groupRect.getY1() < screenRect.getY()) {
+                saveGroup.area = CoinSaveState.LayoutArea.TOP_LEFT;
+                // relative to top left
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY();
+            }
+            // top center
+            else if (groupRect.getX() >= screenRect.getX() && groupRect.getX1() <= screenRect.getX1() && groupRect.getY1() < screenRect.getY()) {
+                // relative to top left
+                saveGroup.area = CoinSaveState.LayoutArea.TOP_CENTER;
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY();
+            }
+            // top right
+            else if (groupRect.getX() > screenRect.getX1() && groupRect.getY1() < screenRect.getY()) {
+                saveGroup.area = CoinSaveState.LayoutArea.TOP_RIGHT;
+                // relative to top right
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY();
+            }
+            // center right
+            else if (groupRect.getX() > screenRect.getX1() && groupRect.getY() >= screenRect.getY() && groupRect.getY1() <= screenRect.getY1()) {
+                saveGroup.area = CoinSaveState.LayoutArea.CENTER_RIGHT;
+                // relative to top right
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY();
+            }
+            // bottom right
+            else if (groupRect.getX() > screenRect.getX1() && groupRect.getY() > screenRect.getY1()) {
+                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_RIGHT;
+                // relative to bottom right
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY1();
+            }
+            // bottom center
+            else if (groupRect.getX() >= screenRect.getX() && groupRect.getX1() <= screenRect.getX1() && groupRect.getY() > screenRect.getY1()) {
+                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_CENTER;
+                // relative to bottom left
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY1();
+            }
+            // bottom left
+            else if (groupRect.getX() < screenRect.getX() && groupRect.getY() > screenRect.getY1()) {
+                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_LEFT;
+                // relative to bottom left
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY1();
+            }
+            // center left
+            else {
+                saveGroup.area = CoinSaveState.LayoutArea.CENTER_LEFT;
+                // relative to top left
+                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
+                saveGroup.vertical = groupRect.getY() - screenRect.getY();
+            }
+            saveState.addGroup(saveGroup);
+        }
+
+        saveState.save();
     }
 
 
@@ -47,11 +133,6 @@ public class LayoutManager {
         int newY = y;
         // collisions to center rect
 
-//        int screenX0 = screen.getGuiLeft();
-//        int screenY0 = screen.getGuiTop();
-//
-//        int screenX1 = screenX0 + screen.getXSize();
-//        int screenY1 = screenY0 + screen.getYSize();
 
         Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
 
@@ -97,10 +178,7 @@ public class LayoutManager {
 
 
         // 计算吸附
-
-
         // 查找最近的吸附组
-
 
         List<Rectangle2i> collisionRects = new ArrayList<>(group.getCollisionRects().size());
 
@@ -169,9 +247,12 @@ public class LayoutManager {
         }
 
 
+        if (group.getGroupX() == newX && group.getGroupY() == newY) {
+            return;
+        }
+
         group.setGroupX(newX);
         group.setGroupY(newY);
-
         computeGroupOverlap(true);
 
     }
@@ -185,10 +266,11 @@ public class LayoutManager {
             offset.setX((offset.getX() % SLOT_SIZE + SLOT_SIZE) % SLOT_SIZE);
             offset.setY((offset.getY() % SLOT_SIZE + SLOT_SIZE) % SLOT_SIZE);
 
-            ArrayList<CoinSlotGroup> list = groupMap.computeIfAbsent(offset, k -> new ArrayList<>());
-            list.add(group);
+            ArrayList<CoinSlotGroup> set = groupMap.computeIfAbsent(offset, k -> new ArrayList<>());
+            set.add(group);
         }
 
+        boolean changed = false;
         for (ArrayList<CoinSlotGroup> list : groupMap.values()) {
             if (list.isEmpty()) {
                 continue;
@@ -207,7 +289,21 @@ public class LayoutManager {
                     }
                     groupA.endUpdate();
                 }
+            } else {
+                boolean modified = CoinSlotGroup.combineGroups(list, SLOT_SIZE);
+                if (modified) {
+                    changed = true;
+                    for (CoinSlotGroup group : list) {
+                        if (group.isDiscard()) {
+                            groups.remove(group);
+                        }
+                    }
+                }
             }
+        }
+
+        if (changed) {
+            rebuildGroupIndex();
         }
     }
 
@@ -236,6 +332,8 @@ public class LayoutManager {
         groups.add(newGroup);
         splitGroup(group);
         rebuildGroupIndex();
+
+        computeGroupOverlap(true);
         return newGroup;
     }
 
@@ -261,6 +359,8 @@ public class LayoutManager {
         ClientCoinStorage storage = ClientCoinStorage.INSTANCE;
         CoinManager manager = CoinManager.getInstance();
 
+        boolean[] used = new boolean[manager.getCoinTypeCount()];
+
         for (int i = 0; i < saveState.getGroups().size(); i++) {
             CoinSaveState.Group group = saveState.getGroups().get(i);
             CoinSlotGroup slotGroup = new CoinSlotGroup();
@@ -274,9 +374,15 @@ public class LayoutManager {
                     continue;
                 }
 
+
                 int slotId = manager.findCoinType(slot.name).id();
+                if (used[slotId]) {
+                    logger.warn("Slot {} is already used", slotId);
+                    continue;
+                }
                 CoinSlot clientSlot = storage.getSlots().get(slotId);
                 slotGroup.addSlot(slot.x, slot.y, clientSlot, false);
+                used[slotId] = true;
 
                 maxX = Math.max(maxX, slot.x);
                 maxY = Math.max(maxY, slot.y);
@@ -285,51 +391,80 @@ public class LayoutManager {
             }
             slotGroup.endUpdate();
 
+            if (slotGroup.empty()) {
+                continue;
+            }
+
             // x
             switch (group.area) {
-                case TOP_LEFT, CENTER_LEFT, BOTTOM_LEFT -> {
+                case TOP_LEFT, TOP_CENTER , CENTER_LEFT -> {
                     int x0 = screen.getGuiLeft();
-                    int groupOffset = (maxX + 1) * SLOT_SIZE;
-                    slotGroup.setGroupX(x0 - groupOffset + group.horizontal);
-
+                    int y0 = screen.getGuiTop();
+                    slotGroup.setGroupX(x0 + group.horizontal);
+                    slotGroup.setGroupY(y0 + group.vertical);
                 }
 
-                case TOP_CENTER, BOTTOM_CENTER -> {
-                    int x0 = screen.getGuiLeft() + screen.getXSize() / 2;
-                    int groupOffset = (maxX + minX + 1) * SLOT_SIZE / 2;
-                    slotGroup.setGroupX(x0 - groupOffset + group.horizontal);
-                }
-
-                case TOP_RIGHT, CENTER_RIGHT, BOTTOM_RIGHT -> {
+                case TOP_RIGHT , CENTER_RIGHT -> {
                     int x0 = screen.getGuiLeft() + screen.getXSize();
-                    int groupOffset = (minX - 1) * SLOT_SIZE;
-                    slotGroup.setGroupX(x0 + groupOffset + group.horizontal);
+                    int y0 = screen.getGuiTop();
+                    slotGroup.setGroupX(x0 + group.horizontal);
+                    slotGroup.setGroupY(y0 + group.vertical);
+                }
+
+                case BOTTOM_LEFT , BOTTOM_CENTER ->  {
+                    int x0 = screen.getGuiLeft();
+                    int y0 = screen.getGuiTop() + screen.getYSize();
+                    slotGroup.setGroupX(x0 + group.horizontal);
+                    slotGroup.setGroupY(y0 + group.vertical);
+                }
+
+                case BOTTOM_RIGHT -> {
+                    int x0 = screen.getGuiLeft() + screen.getXSize();
+                    int y0 = screen.getGuiTop() + screen.getYSize();
+                    slotGroup.setGroupX(x0 + group.horizontal);
+                    slotGroup.setGroupY(y0 + group.vertical);
                 }
             }
 
-            // y
-            switch (group.area) {
-                case TOP_LEFT, TOP_CENTER, TOP_RIGHT -> {
-                    int y0 = screen.getGuiTop();
-                    int groupOffset = (maxY + 1) * SLOT_SIZE;
-                    slotGroup.setGroupY(y0 - groupOffset + group.vertical);
-                }
+            // make sure the group is inside the screen
 
-                case CENTER_LEFT, CENTER_RIGHT -> {
-                    int y0 = screen.getGuiTop() + screen.getYSize() / 2;
-                    int groupOffset = (maxY + minY + 1) * SLOT_SIZE / 2;
-                    slotGroup.setGroupY(y0 - groupOffset + group.vertical);
-                }
+            if (slotGroup.getGroupX() <= 0) {
+                slotGroup.setGroupX(0);
+            }
+            if (slotGroup.getGroupY() <= 0) {
+                slotGroup.setGroupY(0);
+            }
 
-                case BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT -> {
-                    int y0 = screen.getGuiTop() + screen.getYSize();
-                    int groupOffset = (minY - 1) * SLOT_SIZE;
-                    slotGroup.setGroupY(y0 + groupOffset + group.vertical);
-                }
+            if (slotGroup.getGroupX() + slotGroup.getGridWidth() * SLOT_SIZE >= screen.width) {
+                slotGroup.setGroupX(screen.width - slotGroup.getGridWidth() * SLOT_SIZE);
+            }
+
+            if (slotGroup.getGroupY() + slotGroup.getGridHeight() * SLOT_SIZE >= screen.height) {
+                slotGroup.setGroupY(screen.height - slotGroup.getGridHeight() * SLOT_SIZE);
             }
 
             groups.add(slotGroup);
         }
+
+        boolean shouldAddExtra = false;
+        CoinSlotGroup extra = new CoinSlotGroup();
+        extra.beginUpdate();
+        extra.setGroupX(10);
+        extra.setGroupY(10);
+
+        for (int i = 0; i < used.length; i++) {
+            if (!used[i]) {
+                CoinSlot clientSlot = storage.getSlots().get(i);
+                extra.addSlot(0, 0, clientSlot, false);
+                shouldAddExtra = true;
+            }
+        }
+
+        if (shouldAddExtra) {
+            extra.endUpdate();
+            groups.add(extra);
+        }
+
 
         rebuildGroupIndex();
     }

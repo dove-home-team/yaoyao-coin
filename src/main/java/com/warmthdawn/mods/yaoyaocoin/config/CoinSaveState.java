@@ -23,6 +23,14 @@ public class CoinSaveState {
     private static final String SETTINGS_FILE = "CoinScreenLayout.json";
     private static final Gson gson = new Gson();
 
+    public void addSlot(Slot saveSlot) {
+        slots.add(saveSlot);
+    }
+
+    public void addGroup(Group saveGroup) {
+        groups.add(saveGroup);
+    }
+
     public enum LayoutArea {
         TOP_LEFT, TOP_CENTER, TOP_RIGHT, CENTER_LEFT, CENTER_RIGHT, BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT
     }
@@ -107,7 +115,7 @@ public class CoinSaveState {
 
     }
 
-    void clear() {
+    public void clear() {
         groups.clear();
         slots.clear();
     }
@@ -122,9 +130,9 @@ public class CoinSaveState {
 
 
     public void load() {
-        if(loaded) {
-            return;
-        }
+//        if(loaded) {
+//            return;
+//        }
         logger.info("Loading Coin Screen Layout");
 
         File saveStateFile = new File(Minecraft.getInstance().gameDirectory, SETTINGS_FILE);

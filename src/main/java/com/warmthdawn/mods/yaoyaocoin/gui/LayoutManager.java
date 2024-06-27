@@ -1,7 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.logging.LogUtils;
-import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
@@ -38,6 +37,7 @@ public class LayoutManager {
     }
 
     public void finishMovement(AbstractContainerScreen<?> screen) {
+        logger.info("妖月的奇妙硬币：结束鼠标拖拽，开始自动合并硬币槽，当前硬币槽数量：{}", groups.size());
         computeGroupOverlap(false);
         CoinSaveState saveState = CoinSaveState.instance();
         CoinManager manager = CoinManager.getInstance();
@@ -67,61 +67,55 @@ public class LayoutManager {
             });
             Rectangle2i groupRect = new Rectangle2i(group.getGroupX(), group.getGroupY(), group.getGridWidth() * SLOT_SIZE, group.getGridHeight() * SLOT_SIZE);
 
-            // top left
-            if (groupRect.getX1() < screenRect.getX() && groupRect.getY1() < screenRect.getY()) {
-                saveGroup.area = CoinSaveState.LayoutArea.TOP_LEFT;
-                // relative to top left
+            if (groupRect.getX1() < screenRect.getX()) {
                 saveGroup.horizontal = groupRect.getX() - screenRect.getX();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                // 左
+                if (groupRect.getY1() < screenRect.getY()) {
+                    // 上
+                    saveGroup.area = CoinSaveState.LayoutArea.TOP_LEFT;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                } else if (groupRect.getY() >= screenRect.getY1()) {
+                    // 下
+                    saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_LEFT;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY1();
+                } else {
+                    // 中
+                    saveGroup.area = CoinSaveState.LayoutArea.CENTER_LEFT;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                }
             }
-            // top center
-            else if (groupRect.getX() >= screenRect.getX() && groupRect.getX1() <= screenRect.getX1() && groupRect.getY1() < screenRect.getY()) {
-                // relative to top left
-                saveGroup.area = CoinSaveState.LayoutArea.TOP_CENTER;
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY();
-            }
-            // top right
-            else if (groupRect.getX() > screenRect.getX1() && groupRect.getY1() < screenRect.getY()) {
-                saveGroup.area = CoinSaveState.LayoutArea.TOP_RIGHT;
-                // relative to top right
+            if (groupRect.getX() >= screenRect.getX1()) {
+                // 右
                 saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY();
-            }
-            // center right
-            else if (groupRect.getX() > screenRect.getX1() && groupRect.getY() >= screenRect.getY() && groupRect.getY1() <= screenRect.getY1()) {
-                saveGroup.area = CoinSaveState.LayoutArea.CENTER_RIGHT;
-                // relative to top right
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY();
-            }
-            // bottom right
-            else if (groupRect.getX() > screenRect.getX1() && groupRect.getY() > screenRect.getY1()) {
-                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_RIGHT;
-                // relative to bottom right
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY1();
-            }
-            // bottom center
-            else if (groupRect.getX() >= screenRect.getX() && groupRect.getX1() <= screenRect.getX1() && groupRect.getY() > screenRect.getY1()) {
-                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_CENTER;
-                // relative to bottom left
+                if (groupRect.getY1() < screenRect.getY()) {
+                    // 上
+                    saveGroup.area = CoinSaveState.LayoutArea.TOP_RIGHT;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                } else if (groupRect.getY() >= screenRect.getY1()) {
+                    // 下
+                    saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_RIGHT;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY1();
+                } else {
+                    // 中
+                    saveGroup.area = CoinSaveState.LayoutArea.CENTER_RIGHT;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                }
+            } else {
+                // 中
                 saveGroup.horizontal = groupRect.getX() - screenRect.getX();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY1();
-            }
-            // bottom left
-            else if (groupRect.getX() < screenRect.getX() && groupRect.getY() > screenRect.getY1()) {
-                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_LEFT;
-                // relative to bottom left
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY1();
-            }
-            // center left
-            else {
-                saveGroup.area = CoinSaveState.LayoutArea.CENTER_LEFT;
-                // relative to top left
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
-                saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                if (groupRect.getY1() < screenRect.getY()) {
+                    // 上
+                    saveGroup.area = CoinSaveState.LayoutArea.TOP_CENTER;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                } else if (groupRect.getY() >= screenRect.getY1()) {
+                    // 下
+                    saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_CENTER;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY1();
+                } else {
+                    // 中
+                    saveGroup.area = CoinSaveState.LayoutArea.INVALID;
+                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                }
             }
             saveState.addGroup(saveGroup);
         }
@@ -129,16 +123,10 @@ public class LayoutManager {
         saveState.save();
     }
 
-
-    public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y) {
-        int newX = x;
-        int newY = y;
-        // collisions to center rect
-
-
-        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
-
-
+    private boolean collisionWithScreen(Rectangle2i screenRect, CoinSlotGroup group, Vector2i pos) {
+        int newX = pos.getX();
+        int newY = pos.getY();
+        boolean collision = false;
         // 计算碰撞
         for (Rectangle2i rect : group.getCollisionRects()) {
             // check if collisionRects is inside screen rect
@@ -148,6 +136,8 @@ public class LayoutManager {
             if (!screenRect.intersects(rectActual.translated(new Vector2i(newX, newY)))) {
                 continue;
             }
+
+            collision = true;
 
             int xLeft = screenRect.getX() - rectActual.getWidth() - rectActual.getX();
             int xRight = screenRect.getX() + screenRect.getWidth() - rectActual.getX();
@@ -178,6 +168,27 @@ public class LayoutManager {
             }
         }
 
+        pos.setX(newX);
+        pos.setY(newY);
+
+        return collision;
+
+    }
+
+
+    public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y) {
+        int newX = x;
+        int newY = y;
+        // collisions to center rect
+
+
+        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
+
+        Vector2i screenCollision = new Vector2i(newX, newY);
+        if (collisionWithScreen(screenRect, group, screenCollision)) {
+            newX = screenCollision.getX();
+            newY = screenCollision.getY();
+        }
 
         // 计算吸附
         // 查找最近的吸附组
@@ -401,23 +412,22 @@ public class LayoutManager {
                 continue;
             }
 
-            // x
             switch (group.area) {
-                case TOP_LEFT, TOP_CENTER , CENTER_LEFT -> {
+                case TOP_LEFT, TOP_CENTER, CENTER_LEFT, INVALID -> {
                     int x0 = screen.getGuiLeft();
                     int y0 = screen.getGuiTop();
                     slotGroup.setGroupX(x0 + group.horizontal);
                     slotGroup.setGroupY(y0 + group.vertical);
                 }
 
-                case TOP_RIGHT , CENTER_RIGHT -> {
+                case TOP_RIGHT, CENTER_RIGHT -> {
                     int x0 = screen.getGuiLeft() + screen.getXSize();
                     int y0 = screen.getGuiTop();
                     slotGroup.setGroupX(x0 + group.horizontal);
                     slotGroup.setGroupY(y0 + group.vertical);
                 }
 
-                case BOTTOM_LEFT , BOTTOM_CENTER ->  {
+                case BOTTOM_LEFT, BOTTOM_CENTER -> {
                     int x0 = screen.getGuiLeft();
                     int y0 = screen.getGuiTop() + screen.getYSize();
                     slotGroup.setGroupX(x0 + group.horizontal);
@@ -431,6 +441,17 @@ public class LayoutManager {
                     slotGroup.setGroupY(y0 + group.vertical);
                 }
             }
+
+            // move out
+            if (group.area == CoinSaveState.LayoutArea.INVALID) {
+                Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
+                Vector2i pos = new Vector2i(slotGroup.getGroupX(), slotGroup.getGroupY());
+                if (collisionWithScreen(screenRect, slotGroup, pos)) {
+                    slotGroup.setGroupX(pos.getX());
+                    slotGroup.setGroupY(pos.getY());
+                }
+            }
+
 
             // make sure the group is inside the screen
 
@@ -448,6 +469,7 @@ public class LayoutManager {
             if (slotGroup.getGroupY() + slotGroup.getGridHeight() * SLOT_SIZE >= screen.height) {
                 slotGroup.setGroupY(screen.height - slotGroup.getGridHeight() * SLOT_SIZE);
             }
+
 
             groups.add(slotGroup);
         }

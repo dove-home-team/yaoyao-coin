@@ -603,7 +603,7 @@ public class CoinSlotGroup {
 
 
         Int2ObjectOpenHashMap<List<CoinSlotGroup>> groupMap = new Int2ObjectOpenHashMap<>();
-        for(int i = 0; i < groups.size(); i++) {
+        for (int i = 0; i < groups.size(); i++) {
             int g = unionFind.find(i);
             groupMap.computeIfAbsent(g, it -> new ArrayList<>()).add(groups.get(i));
         }
@@ -653,46 +653,17 @@ public class CoinSlotGroup {
 
     public boolean splitUnConnected(List<CoinSlotGroup> splitted) {
 
-        boolean[][] visitedColl = new boolean[gridWidth][gridHeight];
 
         UnionFind unionFind = new UnionFind(slots.size());
 
 
+        final int windowSize = 3;
         for (int i = 0; i < gridHeight; i++) {
             for (int j = 0; j < gridWidth; j++) {
-                if (visitedColl[j][i]) {
-                    continue;
-                }
-                if (!hasSlot(j, i)) {
-                    continue;
-                }
-
-                int slotIndex1 = getSlotGrid(j, i);
-
-                // check for neighbors
-
-                CoinSlotGroup.Neighbour[] its = new CoinSlotGroup.Neighbour[]{
-                        CoinSlotGroup.Neighbour.RIGHT,
-                        CoinSlotGroup.Neighbour.DOWN,
-                        CoinSlotGroup.Neighbour.DOWN_RIGHT,
-                };
-
-
-                for (CoinSlotGroup.Neighbour nei : its) {
-                    if (getNeighbourKind(j, i, nei) == CoinSlotGroup.NeighborKind.Slot_Owned) {
-                        int x = j;
-                        int y = i;
-                        switch (nei) {
-                            case RIGHT -> x++;
-                            case DOWN -> y++;
-                            case DOWN_RIGHT -> {
-                                x++;
-                                y++;
-                            }
-                        }
-                        visitedColl[x][y] = true;
-                        int slotIndex2 = getSlotGrid(x, y);
-                        unionFind.union(slotIndex1, slotIndex2);
+                int[] slotsInRegion = collectSlots(j, windowSize, i);
+                for (int k = 0; k < slotsInRegion.length; k++) {
+                    for (int l = k + 1; l < slotsInRegion.length; l++) {
+                        unionFind.union(slotsInRegion[k], slotsInRegion[l]);
                     }
                 }
             }
@@ -725,6 +696,30 @@ public class CoinSlotGroup {
 
         return true;
 
+    }
+
+    private int[] collectSlots(int j, int windowSize, int i) {
+        IntSet region = new IntOpenHashSet();
+        // 3x3 的窗口内进行卷积，合并相邻的 slot
+        int maxX = Math.min(gridWidth - j, windowSize);
+        int maxY = Math.min(gridHeight - i, windowSize);
+        for (int k = 0; k < maxY; k++) {
+            for (int l = 0; l < maxX; l++) {
+                int slotIndex = getSlotGrid(j + l, i + k);
+                if (slotIndex == -1) {
+                    continue;
+                }
+
+                Entry entry = slots.get(slotIndex);
+                if (entry.isBorrowed) {
+                    continue;
+                }
+                region.add(slotIndex);
+            }
+        }
+
+        int[] regionArray = region.toIntArray();
+        return regionArray;
     }
 
 

@@ -31,6 +31,16 @@ public class LayoutManager {
 
     }
 
+    private Rectangle2i computeScreenRect(AbstractContainerScreen<?> screen) {
+        int borderSize = 4;
+        return new Rectangle2i(
+                screen.getGuiLeft() + borderSize,
+                screen.getGuiTop() + borderSize,
+                screen.getXSize() - borderSize * 2,
+                screen.getYSize() - borderSize * 2
+        );
+    }
+
     void clear() {
         groups.clear();
         slotIdToGroupIndex.clear();
@@ -45,7 +55,8 @@ public class LayoutManager {
         CoinSaveState saveState = CoinSaveState.instance();
         CoinManager manager = CoinManager.getInstance();
 
-        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
+        Rectangle2i screenRect = computeScreenRect(screen);
+        ;
 
         saveState.clear();
         int id = 0;
@@ -185,7 +196,8 @@ public class LayoutManager {
         // collisions to center rect
 
 
-        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
+        Rectangle2i screenRect = computeScreenRect(screen);
+        ;
 
         Vector2i screenCollision = new Vector2i(newX, newY);
         if (collisionWithScreen(screenRect, group, screenCollision)) {
@@ -433,31 +445,34 @@ public class LayoutManager {
                 continue;
             }
 
+            Rectangle2i screenRect = computeScreenRect(screen);
+            ;
+
             switch (group.area) {
                 case TOP_LEFT, TOP_CENTER, CENTER_LEFT, INVALID -> {
-                    int x0 = screen.getGuiLeft();
-                    int y0 = screen.getGuiTop();
+                    int x0 = screenRect.getX();
+                    int y0 = screenRect.getY();
                     slotGroup.setGroupX(x0 + group.horizontal);
                     slotGroup.setGroupY(y0 + group.vertical);
                 }
 
                 case TOP_RIGHT, CENTER_RIGHT -> {
-                    int x0 = screen.getGuiLeft() + screen.getXSize();
-                    int y0 = screen.getGuiTop();
+                    int x0 = screenRect.getX1();
+                    int y0 = screenRect.getY();
                     slotGroup.setGroupX(x0 + group.horizontal);
                     slotGroup.setGroupY(y0 + group.vertical);
                 }
 
                 case BOTTOM_LEFT, BOTTOM_CENTER -> {
-                    int x0 = screen.getGuiLeft();
-                    int y0 = screen.getGuiTop() + screen.getYSize();
+                    int x0 = screenRect.getX();
+                    int y0 = screenRect.getY1();
                     slotGroup.setGroupX(x0 + group.horizontal);
                     slotGroup.setGroupY(y0 + group.vertical);
                 }
 
                 case BOTTOM_RIGHT -> {
-                    int x0 = screen.getGuiLeft() + screen.getXSize();
-                    int y0 = screen.getGuiTop() + screen.getYSize();
+                    int x0 = screenRect.getX1();
+                    int y0 = screenRect.getY1();
                     slotGroup.setGroupX(x0 + group.horizontal);
                     slotGroup.setGroupY(y0 + group.vertical);
                 }
@@ -465,7 +480,6 @@ public class LayoutManager {
 
             // move out
             if (group.area == CoinSaveState.LayoutArea.INVALID) {
-                Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
                 Vector2i pos = new Vector2i(slotGroup.getGroupX(), slotGroup.getGroupY());
                 if (collisionWithScreen(screenRect, slotGroup, pos)) {
                     slotGroup.setGroupX(pos.getX());

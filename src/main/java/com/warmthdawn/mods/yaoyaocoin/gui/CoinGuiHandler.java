@@ -56,6 +56,10 @@ public class CoinGuiHandler extends GuiComponent {
 
     private boolean enabled = false;
 
+    private Rectangle2i guiBounds = new Rectangle2i(0, 0, 0, 0);
+    private Rectangle2i guiInnerBounds = new Rectangle2i(0, 0, 0, 0);
+
+
     private void onMouseRelease(ScreenEvent.MouseReleasedEvent.Pre event) {
         if (!enabled) {
             return;
@@ -164,7 +168,25 @@ public class CoinGuiHandler extends GuiComponent {
 
         if (event.getScreen() instanceof AbstractContainerScreen<?> screen && isSupportedScreen(screen)) {
             layoutManager.init(screen);
+
+            final int slotSize = 20;
+            final int borderSize = 4;
+            guiBounds = new Rectangle2i(
+                    screen.getGuiLeft() + borderSize,
+                    screen.getGuiTop() + borderSize,
+                    screen.getXSize() - borderSize * 2,
+                    screen.getYSize() - borderSize * 2
+            );
+
+            guiInnerBounds = new Rectangle2i(
+                    guiBounds.getX() + slotSize + 1,
+                    guiBounds.getY() + slotSize + 1,
+                    guiBounds.getWidth() - slotSize * 2 - 2,
+                    guiBounds.getHeight() - slotSize * 2 - 2
+            );
             enabled = true;
+
+
         } else {
             layoutManager.clear();
             enabled = false;
@@ -193,7 +215,7 @@ public class CoinGuiHandler extends GuiComponent {
             int y0 = group.getGroupY();
             for (int i = -1; i <= group.getGridHeight(); i++) {
                 for (int j = -1; j <= group.getGridWidth(); j++) {
-                    drawSlot(event.getContainerScreen(), poseStack, group, x0 + j * 20, y0 + i * 20, j, i);
+                    drawSlot(poseStack, group, x0 + j * 20, y0 + i * 20, j, i);
                 }
             }
         }
@@ -397,22 +419,33 @@ public class CoinGuiHandler extends GuiComponent {
     }
 
 
-    private boolean isStickingConnection(AbstractContainerScreen<?> screen, int x, int y) {
-        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
+    private boolean isStickingSlot(int x, int y) {
+        final int slotSize = 20;
 
-        Rectangle2i innerBounds = new Rectangle2i(
-                screenRect.getX() + 21,
-                screenRect.getY() + 21,
-                screenRect.getWidth() - 42,
-                screenRect.getHeight() - 42
-        );
-
-        Rectangle2i slotRect = new Rectangle2i(x, y, 20, 20);
-
-        return screenRect.contains(slotRect);
+        Rectangle2i slotRect = new Rectangle2i(x, y, slotSize, slotSize);
+        return guiBounds.contains(slotRect) && !slotRect.intersects(guiInnerBounds);
     }
 
-    private void drawSlot(AbstractContainerScreen<?> screen, PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {
+    private boolean neighborHasSlot(CoinSlotGroup group, int x0, int y0, int slotX, int slotY, CoinSlotGroup.Neighbour neighbour) {
+        Vector2i offset = CoinSlotGroup.getNeighbourOffset(neighbour);
+
+        slotX += offset.getX();
+        slotY += offset.getY();
+
+        boolean hasSlot = group.hasSlot(slotX, slotY, false);
+        if (hasSlot) {
+            return true;
+        }
+
+
+        int x = x0 + offset.getX() * 20;
+        int y = y0 + offset.getY() * 20;
+
+        return this.isStickingSlot(x, y);
+
+    }
+
+    private void drawSlot(PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {
         boolean hasSlot = group.hasSlot(slotX, slotY);
 
         int x = x0;
@@ -423,45 +456,45 @@ public class CoinGuiHandler extends GuiComponent {
             return;
         }
 
-        if (group.hasSlot(slotX, slotY, false) || isStickingConnection(screen, x, y)) {
+        if (group.hasSlot(slotX, slotY, false) || isStickingSlot(x, y)) {
             return;
         }
 
         // top left
-        CoinSlotGroup.NeighborKind up = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP);
-        CoinSlotGroup.NeighborKind left = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.LEFT);
-        CoinSlotGroup.NeighborKind upLeft = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP_LEFT);
+        boolean up = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.UP);
+        boolean left = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.LEFT);
+        boolean upLeft = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.UP_LEFT);
 
-        if (up != CoinSlotGroup.NeighborKind.Empty) {
+        if (up) {
 
-            if (left != CoinSlotGroup.NeighborKind.Empty) {
+            if (left) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_LEFT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
             }
-        } else if (left != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (left) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
-        } else if (upLeft != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (upLeft) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_LEFT_1);
         }
 
         x = x0 + 10;
         y = y0;
         // top right
-        CoinSlotGroup.NeighborKind upRight = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.UP_RIGHT);
-        CoinSlotGroup.NeighborKind right = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.RIGHT);
+        boolean upRight = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.UP_RIGHT);
+        boolean right = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.RIGHT);
 
 
-        if (up != CoinSlotGroup.NeighborKind.Empty) {
-            if (right != CoinSlotGroup.NeighborKind.Empty) {
+        if (up) {
+            if (right) {
                 // top has slot and right has slot
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_RIGHT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
             }
-        } else if (right != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (right) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
-        } else if (upRight != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (upRight) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_RIGHT_1);
         }
 
@@ -469,18 +502,18 @@ public class CoinGuiHandler extends GuiComponent {
         x = x0;
         y = y0 + 10;
         // bottom left
-        CoinSlotGroup.NeighborKind down = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN);
-        CoinSlotGroup.NeighborKind bottomLeft = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN_LEFT);
+        boolean down = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.DOWN);
+        boolean bottomLeft = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.DOWN_LEFT);
 
-        if (down != CoinSlotGroup.NeighborKind.Empty) {
-            if (left != CoinSlotGroup.NeighborKind.Empty) {
+        if (down) {
+            if (left) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_LEFT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
             }
-        } else if (left != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (left) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
-        } else if (bottomLeft != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (bottomLeft) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_LEFT_1);
         }
 
@@ -488,17 +521,17 @@ public class CoinGuiHandler extends GuiComponent {
         // bottom right
         x = x0 + 10;
         y = y0 + 10;
-        CoinSlotGroup.NeighborKind bottomRight = group.getNeighbourKind(slotX, slotY, CoinSlotGroup.Neighbour.DOWN_RIGHT);
+        boolean bottomRight = neighborHasSlot(group, x0, y0, slotX, slotY, CoinSlotGroup.Neighbour.DOWN_RIGHT);
 
-        if (down != CoinSlotGroup.NeighborKind.Empty) {
-            if (right != CoinSlotGroup.NeighborKind.Empty) {
+        if (down) {
+            if (right) {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_RIGHT_3);
             } else {
                 drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
             }
-        } else if (right != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (right) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
-        } else if (bottomRight != CoinSlotGroup.NeighborKind.Empty) {
+        } else if (bottomRight) {
             drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_RIGHT_1);
         }
 

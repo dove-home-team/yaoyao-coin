@@ -1,5 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
+import com.google.common.collect.ImmutableMap;
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
@@ -284,7 +285,7 @@ public class CoinSlotGroup {
                         int x = horizontal ? k : j;
                         int y = horizontal ? i : k;
 
-                        if(visitedAds[y + 1][x + 1]) {
+                        if (visitedAds[y + 1][x + 1]) {
                             break;
                         }
 
@@ -815,27 +816,18 @@ public class CoinSlotGroup {
 
     }
 
-    public NeighborKind getNeighbourKind(int slotX, int slotY, Neighbour neighbour) {
-        Entry entry = switch (neighbour) {
-            case UP -> this.getSlotAt(slotX, slotY - 1);
-            case DOWN -> this.getSlotAt(slotX, slotY + 1);
-            case LEFT -> this.getSlotAt(slotX - 1, slotY);
-            case RIGHT -> this.getSlotAt(slotX + 1, slotY);
-            case UP_LEFT -> this.getSlotAt(slotX - 1, slotY - 1);
-            case UP_RIGHT -> this.getSlotAt(slotX + 1, slotY - 1);
-            case DOWN_LEFT -> this.getSlotAt(slotX - 1, slotY + 1);
-            case DOWN_RIGHT -> this.getSlotAt(slotX + 1, slotY + 1);
+    public static Vector2i getNeighbourOffset(Neighbour neighbour) {
+        return switch (neighbour) {
+            case UP -> new Vector2i(0, -1);
+            case DOWN -> new Vector2i(0, 1);
+            case LEFT -> new Vector2i(-1, 0);
+            case RIGHT -> new Vector2i(1, 0);
+            case UP_LEFT -> new Vector2i(-1, -1);
+            case UP_RIGHT -> new Vector2i(1, -1);
+            case DOWN_LEFT -> new Vector2i(-1, 1);
+            case DOWN_RIGHT -> new Vector2i(1, 1);
         };
 
-        if (entry == null) {
-            return NeighborKind.Empty;
-        }
-
-        if (entry.isBorrowed) {
-            return NeighborKind.Slot_Borrowed;
-        }
-
-        return NeighborKind.Slot_Owned;
     }
 
 

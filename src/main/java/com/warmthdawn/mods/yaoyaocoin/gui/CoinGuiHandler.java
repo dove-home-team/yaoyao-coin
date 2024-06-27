@@ -119,7 +119,7 @@ public class CoinGuiHandler extends GuiComponent {
             } else if (hoveringGroup != null) {
                 // Prevent click-through on the background and border of the slot
                 boolean isShiftHolding = Screen.hasShiftDown();
-                if (isShiftHolding || hoveringGroup.isSingle()) {
+                if (!isShiftHolding || hoveringGroup.isSingle()) {
                     draggingGroup = hoveringGroup;
                     draggingStartX = mouseX;
                     draggingStartY = mouseY;

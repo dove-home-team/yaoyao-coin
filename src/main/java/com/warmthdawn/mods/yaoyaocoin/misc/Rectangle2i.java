@@ -70,6 +70,10 @@ public class Rectangle2i {
         return new Rectangle2i(x0 * scale, y0 * scale, width * scale, height * scale);
     }
 
+    public Rectangle2i expand(int amount) {
+        return new Rectangle2i(x0 - amount, y0 - amount, width + 2 * amount, height + 2 * amount);
+    }
+
     public Rectangle2i translated(Vector2i offset) {
         return new Rectangle2i(x0 + offset.getX(), y0 + offset.getY(), width, height);
     }

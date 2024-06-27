@@ -137,6 +137,8 @@ public class LayoutManager {
         int newX = pos.getX();
         int newY = pos.getY();
         boolean collision = false;
+
+        Rectangle2i innerBounds = screenRect.expand(-SLOT_SIZE);
         // 计算碰撞
         for (Rectangle2i rect : group.getCollisionRects()) {
             // check if collisionRects is inside screen rect
@@ -174,18 +176,35 @@ public class LayoutManager {
             // 停在最近的边界
             if (Math.abs(newX - stoppedX) < Math.abs(newY - stoppedY)) {
                 newX = stoppedX;
+
             } else {
                 newY = stoppedY;
+
             }
+
+
         }
 
-        pos.setX(newX);
-        pos.setY(newY);
-
-
-        if (stickyDistance > 0 && !collision) {
+        if (collision) {
             // 计算吸附
+            Rectangle2i groupRect = new Rectangle2i(newX, newY, group.getGridWidth() * SLOT_SIZE, group.getGridHeight() * SLOT_SIZE);
+            if (newY < innerBounds.getY()) {
+                // 将 newY 对其到整数倍的 SLOT_SIZE (四舍五入)
+                newY = screenRect.getY() + Math.round((newY - screenRect.getY()) / (float) SLOT_SIZE) * SLOT_SIZE;
+            } else if (newY + groupRect.getHeight() > innerBounds.getY1()) {
+                // 将 newY 对其到整数倍的 SLOT_SIZE (四舍五入)
+                newY = screenRect.getY1() - groupRect.getHeight() + Math.round((newY - screenRect.getY1() + groupRect.getHeight()) / (float) SLOT_SIZE) * SLOT_SIZE;
+            }
 
+            if (newX < innerBounds.getX()) {
+                // 将 newX 对其到整数倍的 SLOT_SIZE (四舍五入)
+                newX = screenRect.getX() + Math.round((newX - screenRect.getX()) / (float) SLOT_SIZE) * SLOT_SIZE;
+            } else if (newX + groupRect.getWidth() > innerBounds.getX1()) {
+                // 将 newX 对其到整数倍的 SLOT_SIZE (四舍五入)
+                newX = screenRect.getX1() - groupRect.getWidth() + Math.round((newX - screenRect.getX1() + groupRect.getWidth()) / (float) SLOT_SIZE) * SLOT_SIZE;
+            }
+            pos.setX(newX);
+            pos.setY(newY);
 
         }
 
@@ -203,7 +222,7 @@ public class LayoutManager {
         Rectangle2i screenRect = computeScreenRect(screen);
 
         Vector2i screenCollision = new Vector2i(newX, newY);
-        if (collisionWithScreen(screenRect, group, screenCollision, 20)) {
+        if (collisionWithScreen(screenRect, group, screenCollision, 8)) {
             newX = screenCollision.getX();
             newY = screenCollision.getY();
         }

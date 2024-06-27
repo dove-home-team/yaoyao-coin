@@ -7,6 +7,7 @@ import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
 import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import it.unimi.dsi.fastutil.ints.*;
+import org.checkerframework.checker.units.qual.C;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -20,6 +21,10 @@ public class CoinSlotGroup {
 
     public boolean empty() {
         return slots.isEmpty();
+    }
+
+    public int slotSize() {
+        return slots.size();
     }
 
     public enum Neighbour {
@@ -112,7 +117,11 @@ public class CoinSlotGroup {
     }
 
     private int getSlotGrid(int gridX, int gridY) {
-        return slotGrid[(gridX + 1) + (gridY + 1) * (gridWidth + 2)];
+        int index = (gridX + 1) + (gridY + 1) * (gridWidth + 2);
+        if(index < 0 || index >= slotGrid.length) {
+            return -1;
+        }
+        return slotGrid[index];
     }
 
 
@@ -334,12 +343,13 @@ public class CoinSlotGroup {
         }
     }
 
-    public void borrowSlots(CoinSlotGroup groupB, int slotSize) {
+    public boolean borrowSlots(CoinSlotGroup groupB, int slotSize) {
         int xOff = groupB.groupX - groupX;
         int yOff = groupB.groupY - groupY;
         xOff = (int) Math.floor(1.0 * xOff / slotSize);
         yOff = (int) Math.floor(1.0 * yOff / slotSize);
 
+        boolean modified = false;
         for (Entry entry : groupB.slots) {
             if (entry.isBorrowed) {
                 continue;
@@ -368,7 +378,10 @@ public class CoinSlotGroup {
             }
 
             this.addSlotInternalUnsafe(slotX, slotY, ClientCoinStorage.INSTANCE.getSlots().get(entry.slotId), true);
+            modified = true;
         }
+
+        return modified;
 
     }
 
@@ -537,6 +550,14 @@ public class CoinSlotGroup {
             }
         }
 
+        CoinSlotGroup invalidGroup = new CoinSlotGroup();
+
+        invalidGroup.setGroupX(minX - slotSize - 10);
+        invalidGroup.setGroupY(minY);
+
+        int invalidCount = 0;
+        invalidGroup.beginUpdate();
+
         UnionFind unionFind = new UnionFind(groups.size());
 
         int xStart = Integer.MAX_VALUE;
@@ -549,6 +570,9 @@ public class CoinSlotGroup {
             CoinSlotGroup group = groups.get(i);
             int xOff = (group.groupX - minX) / slotSize;
             int yOff = (group.groupY - minY) / slotSize;
+
+            assert ((group.groupX - minX) % slotSize == 0);
+            assert ((group.groupY - minY) % slotSize == 0);
 
             for (Entry entry : group.slots) {
                 if (entry.isBorrowed) {
@@ -563,8 +587,15 @@ public class CoinSlotGroup {
 
                 if (slotMap.containsKey(pos)) {
                     int slotId = slotMap.get(pos);
-                    int otherGroup = slotGroupMap[slotId];
-                    unionFind.union(otherGroup, i);
+                    int groupId = slotGroupMap[slotId];
+                    if(groupId == -1) {
+                        continue;
+                    }
+
+                    invalidGroup.takeSlot(slotId, groups.get(groupId));
+                    invalidCount++;
+
+
                 } else {
                     slotMap.put(pos, entry.slotId);
                 }
@@ -637,7 +668,16 @@ public class CoinSlotGroup {
                         continue;
                     }
 
-                    Entry newEntry = new Entry(otherEntry.girdX + xOff, otherEntry.gridY + yOff, otherEntry.slotId, false);
+                    int slotX = otherEntry.girdX + xOff;
+                    int slotY = otherEntry.gridY + yOff;
+
+                    Entry newEntry = new Entry(slotX, slotY, otherEntry.slotId, false);
+                    int slotIndex = first.getSlotGrid(slotX, slotY);
+                    if (slotIndex != -1) {
+                        first.slots.set(slotIndex, newEntry);
+                        continue;
+                    }
+
                     first.slots.add(newEntry);
                 }
                 other.discardGroup();
@@ -645,6 +685,16 @@ public class CoinSlotGroup {
             first.endUpdate();
 
         }
+
+        if(invalidCount > 0) {
+            for(int i = 0; i < invalidCount; i++) {
+                Entry entry = invalidGroup.slots.get(i);
+                invalidGroup.slots.set(i, new Entry(0, i, entry.slotId, false));
+            }
+            invalidGroup.endUpdate();
+            groups.add(invalidGroup);
+        }
+
 
         return modified;
 

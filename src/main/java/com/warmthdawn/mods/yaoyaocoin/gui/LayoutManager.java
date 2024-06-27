@@ -39,6 +39,9 @@ public class LayoutManager {
     public void finishMovement(AbstractContainerScreen<?> screen) {
         logger.info("妖月的奇妙硬币：结束鼠标拖拽，开始自动合并硬币槽，当前硬币槽数量：{}", groups.size());
         computeGroupOverlap(false);
+
+
+        logger.info("妖月的奇妙硬币：正在保存 {} 个硬币组", groups.size());
         CoinSaveState saveState = CoinSaveState.instance();
         CoinManager manager = CoinManager.getInstance();
 
@@ -272,6 +275,7 @@ public class LayoutManager {
 
 
     private void computeGroupOverlap(boolean borrow) {
+        logger.info("妖月的奇妙硬币：开始合并硬币槽，当前硬币槽数量：{}, 合并模式 {}", groups.size(), borrow ? "借用" : "合并");
         HashMap<Vector2i, ArrayList<CoinSlotGroup>> groupMap = new HashMap<>();
 
         for (CoinSlotGroup group : groups) {
@@ -283,32 +287,42 @@ public class LayoutManager {
             set.add(group);
         }
 
+        logger.info("妖月的奇妙硬币：初步分组，共 {} 大组", groupMap.size());
+
         boolean changed = false;
         for (ArrayList<CoinSlotGroup> list : groupMap.values()) {
             if (list.isEmpty()) {
                 continue;
             }
             if (borrow) {
+                // 借用模式，每个组内互相借用槽位
                 for (int i = 0; i < list.size(); i++) {
                     CoinSlotGroup groupA = list.get(i);
                     groupA.clearBorrowedSlots();
                     groupA.beginUpdate();
+                    boolean modified = false;
                     for (int j = 0; j < list.size(); j++) {
                         if (i == j) {
                             continue;
                         }
                         CoinSlotGroup groupB = list.get(j);
-                        groupA.borrowSlots(groupB, SLOT_SIZE);
+                        if (groupA.borrowSlots(groupB, SLOT_SIZE)) {
+                            modified = true;
+                        }
                     }
                     groupA.endUpdate();
                 }
             } else {
+                logger.info("妖月的奇妙硬币：开始合并硬币槽，本次将合并 {} 个组", groups.size());
                 boolean modified = CoinSlotGroup.combineGroups(list, SLOT_SIZE);
                 if (modified) {
                     changed = true;
                     for (CoinSlotGroup group : list) {
                         if (group.isDiscard()) {
+                            logger.info("妖月的奇妙硬币：丢弃已被合并的组");
                             groups.remove(group);
+                        } else {
+                            logger.info("妖月的奇妙硬币：合并完成，当前组内有 {} 个硬币", group.slotSize());
                         }
                     }
                 }
@@ -335,7 +349,9 @@ public class LayoutManager {
     }
 
     public CoinSlotGroup takeSlot(int slotId, CoinSlotGroup group) {
+        logger.info("妖月的奇妙硬币：开始拆分硬币槽 {}，当前组数量：{}， 当前组包含 {} 个硬币", slotId, groups.size(), group.slotSize());
         if (group.isSingle()) {
+            logger.info("妖月的奇妙硬币：硬币槽 {} 不需要拆分", slotId);
             return group;
         }
         CoinSlotGroup newGroup = new CoinSlotGroup();
@@ -351,16 +367,21 @@ public class LayoutManager {
     }
 
     private void splitGroup(CoinSlotGroup group) {
-
+        logger.info("妖月的奇妙硬币：拆分硬币槽，当前硬币组数量：{}", groups.size());
         ArrayList<CoinSlotGroup> splitted = new ArrayList<>();
         boolean doSplit = group.splitUnConnected(splitted);
 
         if (!doSplit) {
+            logger.info("妖月的奇妙硬币：硬币组 {} 不需要拆分", group);
             return;
         }
 
+        logger.info("将硬币组 {} 拆分为 {} 个硬币组", group, splitted.size());
+
         groups.remove(group);
         groups.addAll(splitted);
+
+        logger.info("妖月的奇妙硬币：拆分完成，当前硬币组数量：{}", groups.size());
     }
 
     public void init(AbstractContainerScreen<?> screen) {

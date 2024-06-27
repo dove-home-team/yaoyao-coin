@@ -39,7 +39,9 @@ public class CoinUtils {
             coins[i] = inv.getCoinCount(i);
         }
 
-        long totalMoney = manager.getTotalMoney(coins);
+        int convertGroup = manager.getCoinType(slotId).convertGroup();
+
+        long totalMoney = manager.getTotalMoneyInGroup(coins, convertGroup);
         int availableCount = (int) (totalMoney / manager.getCoinType(slotId).money());
         count = Math.min(availableCount, count);
 
@@ -189,6 +191,9 @@ public class CoinUtils {
                 if (isShiftHolding) {
                     for (int i = 0; i < manager.getCoinTypeCount(); i++) {
                         CoinType coinType = manager.getCoinType(i);
+                        if (coinType.convertGroup() != type.convertGroup()) {
+                            continue;
+                        }
                         CoinSlot slotIt = storage.getSlots().get(i);
                         totalMoney += (long) coinType.money() * slotIt.getCount();
                     }

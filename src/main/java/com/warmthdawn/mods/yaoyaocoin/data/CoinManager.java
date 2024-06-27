@@ -1,15 +1,21 @@
 package com.warmthdawn.mods.yaoyaocoin.data;
 
+import com.mojang.logging.LogUtils;
+import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
+import org.slf4j.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class CoinManager {
-
+    private static final Logger logger = LogUtils.getLogger();
     private final List<CoinType> coinTypes = new ArrayList<>();
 
-    private int[] coins;
+
+    private final Map<Integer, int[]> coinsMap = new HashMap<>();
+    private final Map<Integer, List<CoinType>> convertMap = new HashMap<>();
 
     private static CoinManager instance;
 
@@ -20,17 +26,52 @@ public class CoinManager {
         return instance;
     }
 
+    private int[] getCoins(int convertGroup) {
+        return coinsMap.getOrDefault(convertGroup, new int[0]);
+    }
 
     public void init() {
 
-        this.coinTypes.add(new CoinType(0, "iron", 1, 0, 9999, new ResourceLocation("minecraft", "iron_ingot"), null));
-        this.coinTypes.add(new CoinType(1, "gold", 3, 0, 999, new ResourceLocation("minecraft", "gold_ingot"), null));
-        this.coinTypes.add(new CoinType(2, "diamond", 10, 0, 100, new ResourceLocation("minecraft", "diamond"), null));
+        int id = 0;
 
-        coins = new int[coinTypes.size()];
-        for (int i = 0; i < coins.length; i++) {
-            coins[i] = this.coinTypes.get(i).money();
+        CoinDefine.instance().load();
+
+        for (CoinDefine.CoinType coinType : CoinDefine.instance().getCoinTypes()) {
+            // convert string to tag
+            Tag tag = null;
+
+            if (coinType.itemTag != null) {
+                try {
+                    tag = TagParser.parseTag(coinType.itemTag);
+                } catch (Exception e) {
+                    logger.error("Failed to parse item tag for coin type {}", coinType.name);
+                    e.printStackTrace();
+                }
+            }
+            coinTypes.add(new CoinType(id++, coinType.name, coinType.money, coinType.convertGroup, coinType.maxStackSize, new ResourceLocation(coinType.itemName), tag));
         }
+
+        convertMap.clear();
+        for (CoinType type : coinTypes) {
+            convertMap.computeIfAbsent(type.convertGroup(), k -> new ArrayList<>()).add(type);
+        }
+
+        coinsMap.clear();
+        for (Map.Entry<Integer, List<CoinType>> entry : convertMap.entrySet()) {
+            int convertGroup = entry.getKey();
+            List<CoinType> types = entry.getValue();
+
+            types.sort(Comparator.comparingInt(CoinType::money));
+
+            int[] coins = new int[types.size()];
+            for (int i = 0; i < types.size(); i++) {
+                coins[i] = types.get(i).money();
+            }
+
+
+            coinsMap.put(convertGroup, coins);
+        }
+
     }
 
 
@@ -56,20 +97,86 @@ public class CoinManager {
     }
 
 
-    public long getTotalMoney(int[] count) {
+    public long getTotalMoneyInGroup(int[] count, int convertGroup) {
+        if (count.length != coinTypes.size()) {
+            throw new IllegalArgumentException("count length must be equal to coinTypes length");
+        }
         long total = 0;
-        for (int i = 0; i < count.length; i++) {
-            total += (long) count[i] * coins[i];
+        for (int i = 0; i < coinTypes.size(); i++) {
+            CoinType type = getCoinType(i);
+            if (type.convertGroup() == convertGroup) {
+                total += (long) count[i] * type.money();
+            }
         }
         return total;
     }
 
-    public void inspectCoins(int[] count, int inspectIndex) {
-        if(count.length != coins.length) {
+
+    public void inspectCoins(int[] coinCounts, int inspectIndex) {
+
+        CoinType inspectType = getCoinType(inspectIndex);
+        int convertGroup = inspectType.convertGroup();
+
+        List<CoinType> convertTypes = convertMap.get(convertGroup);
+
+        int[] counts = new int[convertTypes.size()];
+
+        int mappedId = -1;
+
+        for (int i = 0; i < convertTypes.size(); i++) {
+            int coinId = convertTypes.get(i).id();
+            counts[i] = coinCounts[coinId];
+            if (coinId == inspectIndex) {
+                mappedId = i;
+            }
+        }
+
+        inspectCoinsInGroup(counts, mappedId, convertGroup);
+
+        // map back
+        for (int i = 0; i < convertTypes.size(); i++) {
+            int coinId = convertTypes.get(i).id();
+            coinCounts[coinId] = counts[i];
+        }
+    }
+
+    public void computeCoins(long totalMoney, int[] coinCounts, int inspectIndex, int count) {
+
+        CoinType inspectType = getCoinType(inspectIndex);
+        int convertGroup = inspectType.convertGroup();
+
+        List<CoinType> convertTypes = convertMap.get(convertGroup);
+
+        int[] counts = new int[convertTypes.size()];
+
+        int mappedId = -1;
+
+        for (int i = 0; i < convertTypes.size(); i++) {
+            int coinId = convertTypes.get(i).id();
+            if (coinId == inspectIndex) {
+                mappedId = i;
+            }
+            counts[i] = coinCounts[coinId];
+        }
+        computeCoinsInGroup(totalMoney, counts, mappedId, count, convertGroup);
+
+        // map back
+        for (int i = 0; i < convertTypes.size(); i++) {
+            int coinId = convertTypes.get(i).id();
+            coinCounts[coinId] = counts[i];
+        }
+    }
+
+    public void inspectCoinsInGroup(int[] count, int inspectIndex, int convertGroup) {
+        int[] coins = getCoins(convertGroup);
+        if (count.length != coins.length) {
             throw new IllegalArgumentException("count length must be equal to coins length");
         }
 
-        long total = getTotalMoney(count);
+        long total = 0;
+        for (int i = 0; i < count.length; i++) {
+            total += (long) count[i] * coins[i];
+        }
 
         long max = (int) (total / coins[inspectIndex]);
 
@@ -79,9 +186,9 @@ public class CoinManager {
 
         long remaining = total - max * coins[inspectIndex];
 
-        for(int i = coins.length - 1; i >= 0; i--) {
+        for (int i = coins.length - 1; i >= 0; i--) {
             int maxTake = count[i];
-            if(i == inspectIndex) {
+            if (i == inspectIndex) {
                 continue;
             }
 
@@ -97,7 +204,8 @@ public class CoinManager {
         count[inspectIndex] = (int) max;
     }
 
-    public void computeCoins(long total, int[] count, int takenIndex, int takenCount) {
+    public void computeCoinsInGroup(long total, int[] count, int takenIndex, int takenCount, int convertGroup) {
+        int[] coins = getCoins(convertGroup);
         if (count.length != coins.length) {
             throw new IllegalArgumentException("count length must be equal to coins length");
         }

@@ -58,7 +58,9 @@ public class CoinSaveState {
 
     private final List<Group> groups = new ArrayList<>();
     private final List<Slot> slots = new ArrayList<>();
-    private boolean loaded = false;
+
+    // not serialized with gson
+    private transient boolean loaded = false;
 
     public void save() {
         logger.info("Saving Coin Screen Layout");
@@ -130,9 +132,9 @@ public class CoinSaveState {
 
 
     public void load() {
-//        if(loaded) {
-//            return;
-//        }
+        if(loaded) {
+            return;
+        }
         logger.info("Loading Coin Screen Layout");
 
         File saveStateFile = new File(Minecraft.getInstance().gameDirectory, SETTINGS_FILE);

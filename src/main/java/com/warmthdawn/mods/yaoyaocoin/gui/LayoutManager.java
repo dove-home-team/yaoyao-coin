@@ -1,8 +1,10 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.logging.LogUtils;
+import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
+import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
@@ -373,9 +375,13 @@ public class LayoutManager {
                 if (slot.groupId != group.id) {
                     continue;
                 }
+                CoinType type = manager.findCoinType(slot.name);
+                if (type == null) {
+                    logger.warn("Unknown coin type {}", slot.name);
+                    continue;
+                }
 
-
-                int slotId = manager.findCoinType(slot.name).id();
+                int slotId = type.id();
                 if (used[slotId]) {
                     logger.warn("Slot {} is already used", slotId);
                     continue;

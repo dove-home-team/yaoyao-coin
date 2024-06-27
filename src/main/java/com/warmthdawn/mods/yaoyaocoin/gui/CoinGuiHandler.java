@@ -12,6 +12,7 @@ import net.minecraft.client.gui.GuiComponent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.ItemRenderer;
@@ -146,6 +147,10 @@ public class CoinGuiHandler extends GuiComponent {
         // disable for creative inventory
 
         if (screen instanceof CreativeModeInventoryScreen) {
+            return false;
+        }
+
+        if (screen instanceof InventoryScreen && Minecraft.getInstance().player.isCreative()) {
             return false;
         }
 

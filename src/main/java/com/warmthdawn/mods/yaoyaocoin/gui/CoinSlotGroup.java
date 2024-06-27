@@ -1,8 +1,8 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
-import com.google.common.collect.ImmutableMap;
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
+import com.warmthdawn.mods.yaoyaocoin.data.SlotKind;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
@@ -28,23 +28,25 @@ public class CoinSlotGroup {
     }
 
     public enum Neighbour {
-        UP,
-        DOWN,
-        LEFT,
-        RIGHT,
+        UP(0, -1),
+        DOWN(0, 1),
+        LEFT(-1, 0),
+        RIGHT(1, 0),
 
-        UP_LEFT,
-        UP_RIGHT,
-        DOWN_LEFT,
-        DOWN_RIGHT,
+        UP_LEFT(-1, -1),
+        UP_RIGHT(1, -1),
+        DOWN_LEFT(-1, 1),
+        DOWN_RIGHT(1, 1);
+
+        public final int offsetX;
+        public final int offsetY;
+
+        Neighbour(int offsetX, int offsetY) {
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
+        }
     }
 
-
-    public enum NeighborKind {
-        Slot_Owned,
-        Slot_Borrowed,
-        Empty
-    }
 
     public interface SlotConsumer {
         void accept(int x, int y, CoinSlot slot, boolean borrowed);
@@ -816,18 +818,15 @@ public class CoinSlotGroup {
 
     }
 
-    public static Vector2i getNeighbourOffset(Neighbour neighbour) {
-        return switch (neighbour) {
-            case UP -> new Vector2i(0, -1);
-            case DOWN -> new Vector2i(0, 1);
-            case LEFT -> new Vector2i(-1, 0);
-            case RIGHT -> new Vector2i(1, 0);
-            case UP_LEFT -> new Vector2i(-1, -1);
-            case UP_RIGHT -> new Vector2i(1, -1);
-            case DOWN_LEFT -> new Vector2i(-1, 1);
-            case DOWN_RIGHT -> new Vector2i(1, 1);
-        };
-
+    public SlotKind getSlotKind(int slotX, int slotY) {
+        Entry entry = getSlotAt(slotX, slotY);
+        if (entry == null) {
+            return SlotKind.Empty;
+        }
+        if (entry.isBorrowed) {
+            return SlotKind.Virtual;
+        }
+        return SlotKind.Real;
     }
 
 

@@ -37,7 +37,7 @@ public class LayoutManager {
                 screen.getGuiLeft() + borderSize,
                 screen.getGuiTop() + borderSize,
                 screen.getXSize() - borderSize * 2,
-                screen.getYSize() - borderSize * 2
+                screen.getYSize() - borderSize * 2 - 1
         );
     }
 

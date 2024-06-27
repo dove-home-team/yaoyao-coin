@@ -22,6 +22,10 @@ public class Rectangle2i {
         return point.getX() >= x0 && point.getX() < x0 + width && point.getY() >= y0 && point.getY() < y0 + height;
     }
 
+    public boolean contains(Rectangle2i other) {
+        return x0 <= other.x0 && y0 <= other.y0 && x0 + width >= other.x0 + other.width && y0 + height >= other.y0 + other.height;
+    }
+
     public int getX() {
         return x0;
     }

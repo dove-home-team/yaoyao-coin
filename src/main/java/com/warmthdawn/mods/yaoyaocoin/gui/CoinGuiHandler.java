@@ -5,6 +5,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
+import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
+import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import com.warmthdawn.mods.yaoyaocoin.mixin.AbstractContainerScreenAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -191,7 +193,7 @@ public class CoinGuiHandler extends GuiComponent {
             int y0 = group.getGroupY();
             for (int i = -1; i <= group.getGridHeight(); i++) {
                 for (int j = -1; j <= group.getGridWidth(); j++) {
-                    drawSlot(poseStack, group, x0 + j * 20, y0 + i * 20, j, i);
+                    drawSlot(event.getContainerScreen(), poseStack, group, x0 + j * 20, y0 + i * 20, j, i);
                 }
             }
         }
@@ -394,7 +396,23 @@ public class CoinGuiHandler extends GuiComponent {
         return slotId;
     }
 
-    private void drawSlot(PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {
+
+    private boolean isStickingConnection(AbstractContainerScreen<?> screen, int x, int y) {
+        Rectangle2i screenRect = new Rectangle2i(screen.getGuiLeft(), screen.getGuiTop(), screen.getXSize(), screen.getYSize());
+
+        Rectangle2i innerBounds = new Rectangle2i(
+                screenRect.getX() + 21,
+                screenRect.getY() + 21,
+                screenRect.getWidth() - 42,
+                screenRect.getHeight() - 42
+        );
+
+        Rectangle2i slotRect = new Rectangle2i(x, y, 20, 20);
+
+        return screenRect.contains(slotRect);
+    }
+
+    private void drawSlot(AbstractContainerScreen<?> screen, PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {
         boolean hasSlot = group.hasSlot(slotX, slotY);
 
         int x = x0;
@@ -405,7 +423,7 @@ public class CoinGuiHandler extends GuiComponent {
             return;
         }
 
-        if (group.hasSlot(slotX, slotY, false)) {
+        if (group.hasSlot(slotX, slotY, false) || isStickingConnection(screen, x, y)) {
             return;
         }
 

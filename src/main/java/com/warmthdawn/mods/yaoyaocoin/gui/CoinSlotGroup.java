@@ -7,7 +7,6 @@ import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
 import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import it.unimi.dsi.fastutil.ints.*;
-import org.checkerframework.checker.units.qual.C;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -118,7 +117,7 @@ public class CoinSlotGroup {
 
     private int getSlotGrid(int gridX, int gridY) {
         int index = (gridX + 1) + (gridY + 1) * (gridWidth + 2);
-        if(index < 0 || index >= slotGrid.length) {
+        if (index < 0 || index >= slotGrid.length) {
             return -1;
         }
         return slotGrid[index];
@@ -204,6 +203,9 @@ public class CoinSlotGroup {
         return new Vector2i(groupX, groupY);
     }
 
+
+    private static final boolean[] TRUE_AND_FALSE = new boolean[]{true, false};
+
     private void computeCollisionRects() {
         collisionRects.clear();
         boolean[][] visitedColl = new boolean[gridHeight][gridWidth];
@@ -223,20 +225,32 @@ public class CoinSlotGroup {
                 int maxY = i;
                 visitedColl[i][j] = true;
 
-                for (int k = i; k < gridHeight; k++) {
-                    for (int l = j; l < gridWidth; l++) {
-                        Entry other = getSlotAt(l, k);
+
+                for (boolean horizontal : TRUE_AND_FALSE) {
+                    int iterCount = horizontal ? gridWidth : gridHeight;
+                    int iterStart = horizontal ? j : i;
+                    boolean flag = false;
+                    for (int k = iterStart; k < iterCount; k++) {
+                        int x = horizontal ? k : j;
+                        int y = horizontal ? i : k;
+                        Entry other = getSlotAt(x, y);
                         if (other == null || other.isBorrowed || other.slotId == entry.slotId) {
-                            continue;
-                        }
-                        if (visitedColl[k][l]) {
                             break;
                         }
-                        minX = Math.min(minX, l);
-                        minY = Math.min(minY, k);
-                        maxX = Math.max(maxX, l);
-                        maxY = Math.max(maxY, k);
-                        visitedColl[k][l] = true;
+                        if (visitedColl[y][x]) {
+                            break;
+                        }
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                        visitedColl[y][x] = true;
+                        flag = true;
+
+                    }
+
+                    if (flag) {
+                        break;
                     }
                 }
                 collisionRects.add(new Rectangle2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
@@ -261,27 +275,30 @@ public class CoinSlotGroup {
                 int maxY = i;
                 visitedAds[i + 1][j + 1] = true;
 
-                for (int k = i; k <= gridHeight; k++) {
-                    for (int l = j; l <= gridWidth; l++) {
-                        if (k == i && l == j) {
-                            continue;
-                        }
+                for (boolean horizontal : TRUE_AND_FALSE) {
+                    int iterCount = horizontal ? gridWidth : gridHeight;
+                    int iterStart = horizontal ? j : i;
+                    boolean flag = false;
+                    for (int k = iterStart + 1; k <= iterCount; k++) {
 
-                        if (visitedAds[k + 1][l + 1]) {
+                        int x = horizontal ? k : j;
+                        int y = horizontal ? i : k;
+
+                        if(visitedAds[y + 1][x + 1]) {
                             break;
                         }
-                        boolean isAdsorptionOther = isAdsorptionSlot(l, k);
+
+                        boolean isAdsorptionOther = isAdsorptionSlot(x, y);
                         if (!isAdsorptionOther) {
                             continue;
                         }
-                        minX = Math.min(minX, l);
-                        minY = Math.min(minY, k);
-                        maxX = Math.max(maxX, l);
-                        maxY = Math.max(maxY, k);
-                        visitedAds[k + 1][l + 1] = true;
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                        visitedAds[y + 1][x + 1] = true;
                     }
                 }
-
                 adsorptionRects.add(new Rectangle2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
             }
         }
@@ -588,7 +605,7 @@ public class CoinSlotGroup {
                 if (slotMap.containsKey(pos)) {
                     int slotId = slotMap.get(pos);
                     int groupId = slotGroupMap[slotId];
-                    if(groupId == -1) {
+                    if (groupId == -1) {
                         continue;
                     }
 
@@ -603,9 +620,9 @@ public class CoinSlotGroup {
         }
 
 
-        // 在 3x3 的窗口内进行卷积，合并相邻的 slot
+        // 在 2x2 的窗口内进行卷积，合并相邻的 slot
 
-        int windowSize = 3;
+        int windowSize = 2;
         for (int i = yStart; i <= yEnd + 1; i++) {
             for (int j = xStart; j <= xEnd + 1; j++) {
                 HashSet<Integer> groupSet = new HashSet<>();
@@ -686,8 +703,8 @@ public class CoinSlotGroup {
 
         }
 
-        if(invalidCount > 0) {
-            for(int i = 0; i < invalidCount; i++) {
+        if (invalidCount > 0) {
+            for (int i = 0; i < invalidCount; i++) {
                 Entry entry = invalidGroup.slots.get(i);
                 invalidGroup.slots.set(i, new Entry(0, i, entry.slotId, false));
             }
@@ -707,7 +724,7 @@ public class CoinSlotGroup {
         UnionFind unionFind = new UnionFind(slots.size());
 
 
-        final int windowSize = 3;
+        final int windowSize = 2;
         for (int i = 0; i < gridHeight; i++) {
             for (int j = 0; j < gridWidth; j++) {
                 int[] slotsInRegion = collectSlots(j, windowSize, i);

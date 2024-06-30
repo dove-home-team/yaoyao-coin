@@ -5,6 +5,7 @@ import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
+import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoin;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.resources.ResourceLocation;
@@ -41,16 +42,6 @@ import java.util.concurrent.atomic.AtomicReference;
 @Mod.EventBusSubscriber
 public class CoinEventHandler {
 
-    private static final Lazy<Set<ResourceLocation>> playerCoinSet = Lazy.of(() -> {
-        ImmutableSet.Builder<ResourceLocation> builder = ImmutableSet.builder();
-
-        for(int i = 0; i < CoinManager.getInstance().getCoinTypeCount(); i++) {
-            CoinType coinType = CoinManager.getInstance().getCoinType(i);
-            builder.add(coinType.itemName());
-        }
-        return builder.build();
-    });
-
     @SubscribeEvent
     public static void playerPickup(EntityItemPickupEvent event) {
         Player player = event.getPlayer();
@@ -65,8 +56,7 @@ public class CoinEventHandler {
             return;
         }
 
-        ResourceLocation itemName = stack.getItem().getRegistryName();
-        if(!playerCoinSet.get().contains(itemName)) {
+        if(!CoinUtils.mayCoinItem(stack)) {
             return;
         }
 

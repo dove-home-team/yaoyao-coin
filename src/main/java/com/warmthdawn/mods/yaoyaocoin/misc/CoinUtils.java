@@ -1,5 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.misc;
 
+import com.google.common.collect.ImmutableSet;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
@@ -8,21 +9,45 @@ import com.warmthdawn.mods.yaoyaocoin.gui.ClientCoinStorage;
 import com.warmthdawn.mods.yaoyaocoin.gui.CoinSlot;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketCoinSlotClicked;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.ItemHandlerHelper;
+
+import java.util.Set;
 
 public class CoinUtils {
 
     public enum ClickType {
-        PickOne,
+        //        PickOne,
         PickStack,
         PickHalf,
+
+        QuickMoveStack,
+        QuickMoveOne,
 
         StoreOne,
         StoreStack,
     }
+
+    private static final Lazy<Set<ResourceLocation>> playerCoinSet = Lazy.of(() -> {
+        ImmutableSet.Builder<ResourceLocation> builder = ImmutableSet.builder();
+
+        for(int i = 0; i < CoinManager.getInstance().getCoinTypeCount(); i++) {
+            CoinType coinType = CoinManager.getInstance().getCoinType(i);
+            builder.add(coinType.itemName());
+        }
+        return builder.build();
+    });
+
+    public static boolean mayCoinItem(ItemStack stack) {
+        return playerCoinSet.get().contains(stack.getItem().getRegistryName());
+    }
+
 
 
     public static ItemStack extractCoinAutoTransform(CoinInventoryCapability.CoinInventory inv, int slotId, int count, Player player) {
@@ -72,6 +97,51 @@ public class CoinUtils {
 
     }
 
+    private static int handleQuickMove(ItemStack sample, int count, AbstractContainerMenu container) {
+        for (int i = 0; i < container.slots.size(); i++) {
+            Slot slot = container.getSlot(i);
+            ItemStack itemstack = slot.getItem();
+            if (!itemstack.isEmpty() && ItemStack.isSameItemSameTags(sample, itemstack)) {
+                int j = itemstack.getCount() + count;
+                int maxSize = Math.min(slot.getMaxStackSize(), sample.getMaxStackSize());
+                if (j <= maxSize) {
+                    count = 0;
+                    itemstack.setCount(j);
+                    slot.setChanged();
+                } else if (itemstack.getCount() < maxSize) {
+                    count -= maxSize - itemstack.getCount();
+                    itemstack.setCount(maxSize);
+                    slot.setChanged();
+                }
+            }
+        }
+
+        if (count == 0) {
+            return 0;
+        }
+
+        for (int i = 0; i < container.slots.size(); i++) {
+            Slot slot1 = container.getSlot(i);
+            ItemStack itemstack1 = slot1.getItem();
+            if (itemstack1.isEmpty() && slot1.mayPlace(sample)) {
+                if (count > slot1.getMaxStackSize()) {
+                    ItemStack stack = ItemHandlerHelper.copyStackWithSize(sample, slot1.getMaxStackSize());
+                    count -= slot1.getMaxStackSize();
+                    slot1.set(stack);
+                } else {
+                    ItemStack stack = ItemHandlerHelper.copyStackWithSize(sample, count);
+                    count = 0;
+                    slot1.set(stack);
+                }
+
+                slot1.setChanged();
+                break;
+            }
+        }
+
+        return count;
+    }
+
     public static void handleSlotClickServer(int slotId, ClickType clickType, ItemStack stack, boolean autoTransform, Player player) {
 
         CoinManager manager = CoinManager.getInstance();
@@ -87,18 +157,21 @@ public class CoinUtils {
             ItemStack slotStack = it.getStackInSlot(slotId);
 
             switch (clickType) {
-                case PickOne:
+                case QuickMoveOne:
+                case QuickMoveStack:
                 case PickStack:
                 case PickHalf: {
                     if (!finalStack.isEmpty()) {
                         return;
                     }
                     int pickCount = switch (clickType) {
-                        case PickOne -> 1;
-                        case PickStack -> slotStack.getMaxStackSize();
+                        case QuickMoveOne -> 1;
+                        case PickStack, QuickMoveStack -> slotStack.getMaxStackSize();
                         case PickHalf -> slotStack.getMaxStackSize() / 2;
                         default -> 0;
                     };
+
+                    boolean isQuickMove = clickType == ClickType.QuickMoveOne || clickType == ClickType.QuickMoveStack;
 
                     ItemStack pickedStack = ItemStack.EMPTY;
                     if (autoTransform) {
@@ -112,7 +185,18 @@ public class CoinUtils {
                         pickedStack = it.extractItem(slotId, pickCount, false);
                     }
 
-                    player.containerMenu.setCarried(pickedStack);
+                    if (isQuickMove) {
+                        int rest = handleQuickMove(pickedStack, pickedStack.getCount(), player.containerMenu);
+                        if (rest > 0) {
+                            pickedStack.setCount(rest);
+                            player.containerMenu.setCarried(pickedStack);
+                        } else {
+                            player.containerMenu.setCarried(ItemStack.EMPTY);
+                        }
+                    } else {
+                        player.containerMenu.setCarried(pickedStack);
+                    }
+
                     player.containerMenu.broadcastChanges();
 
                 }
@@ -168,18 +252,25 @@ public class CoinUtils {
 
         if (stack.isEmpty()) {
 
-            int pickCount = 0;
-
             int maxStackSize = slot.getStack().getMaxStackSize();
-            ClickType clickType = ClickType.PickOne;
-            if (isRightClick) {
+            boolean quickMove = false;
+
+            int pickCount;
+            ClickType clickType;
+            if (isShiftHolding && isRightClick) {
+                clickType = ClickType.QuickMoveOne;
                 pickCount = 1;
+                quickMove = true;
             } else if (isShiftHolding) {
-                clickType = ClickType.PickStack;
+                clickType = ClickType.QuickMoveStack;
                 pickCount = maxStackSize;
-            } else {
+                quickMove = true;
+            } else if (isRightClick) {
                 clickType = ClickType.PickHalf;
                 pickCount = maxStackSize / 2;
+            } else {
+                clickType = ClickType.PickStack;
+                pickCount = maxStackSize;
             }
 
             boolean autoTransform = false;
@@ -236,6 +327,10 @@ public class CoinUtils {
             }
 
             sendSlotClickPacket(slotId, clickType, ItemStack.EMPTY, autoTransform);
+
+            if (quickMove) {
+                return ItemStack.EMPTY;
+            }
 
             return pickedStack;
 

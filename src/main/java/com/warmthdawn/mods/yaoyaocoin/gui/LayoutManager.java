@@ -9,6 +9,7 @@ import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -33,12 +34,15 @@ public class LayoutManager {
 
     private Rectangle2i computeScreenRect(AbstractContainerScreen<?> screen) {
         int borderSize = 4;
-        return new Rectangle2i(
-                screen.getGuiLeft() + borderSize,
-                screen.getGuiTop() + borderSize,
-                screen.getXSize() - borderSize * 2,
-                screen.getYSize() - borderSize * 2 - 1
-        );
+
+        Rectangle2i rect = new Rectangle2i(screen.getGuiLeft() + borderSize, screen.getGuiTop() + borderSize, screen.getXSize() - borderSize * 2, screen.getYSize() - borderSize * 2);
+
+        if (screen instanceof ContainerScreen) {
+            // chest has one pixel offset
+            rect.setHeight(rect.getHeight() - 1);
+        }
+
+        return rect;
     }
 
     void clear() {
@@ -77,56 +81,81 @@ public class LayoutManager {
             });
             Rectangle2i groupRect = new Rectangle2i(group.getGroupX(), group.getGroupY(), group.getGridWidth() * SLOT_SIZE, group.getGridHeight() * SLOT_SIZE);
 
-            if (groupRect.getX1() < screenRect.getX()) {
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
-                // 左
-                if (groupRect.getY1() < screenRect.getY()) {
+            boolean dockTop = true;
+            boolean dockLeft = true;
+
+            // 垂直
+            {
+                if (groupRect.getY1() <= screenRect.getY()) {
                     // 上
-                    saveGroup.area = CoinSaveState.LayoutArea.TOP_LEFT;
                     saveGroup.vertical = groupRect.getY() - screenRect.getY();
                 } else if (groupRect.getY() >= screenRect.getY1()) {
                     // 下
-                    saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_LEFT;
+                    dockTop = false;
                     saveGroup.vertical = groupRect.getY() - screenRect.getY1();
                 } else {
-                    // 中
-                    saveGroup.area = CoinSaveState.LayoutArea.CENTER_LEFT;
-                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                    int topDist = groupRect.getY() - screenRect.getY();
+                    int bottomDist = groupRect.getY1() - screenRect.getY1();
+
+                    boolean topStick = topDist % SLOT_SIZE == 0;
+                    boolean bottomStick = bottomDist % SLOT_SIZE == 0;
+
+                    if (topStick == bottomStick) {
+                        if (topDist <= bottomDist) {
+                            saveGroup.vertical = topDist;
+                        } else {
+                            dockTop = false;
+                            saveGroup.vertical = bottomDist - groupRect.getHeight();
+                        }
+                    } else if (topStick) {
+                        saveGroup.vertical = topDist;
+                    } else {
+                        dockTop = false;
+                        saveGroup.vertical = bottomDist - groupRect.getHeight();
+                    }
                 }
             }
-            if (groupRect.getX() >= screenRect.getX1()) {
-                // 右
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
-                if (groupRect.getY1() < screenRect.getY()) {
-                    // 上
-                    saveGroup.area = CoinSaveState.LayoutArea.TOP_RIGHT;
-                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
-                } else if (groupRect.getY() >= screenRect.getY1()) {
-                    // 下
-                    saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_RIGHT;
-                    saveGroup.vertical = groupRect.getY() - screenRect.getY1();
+
+            // 水平
+            {
+                if (groupRect.getX1() <= screenRect.getX()) {
+                    saveGroup.horizontal = groupRect.getX() - screenRect.getX();
+                } else if (groupRect.getX() >= screenRect.getX1()) {
+                    saveGroup.horizontal = groupRect.getX() - screenRect.getX1();
+                    dockLeft = false;
                 } else {
-                    // 中
-                    saveGroup.area = CoinSaveState.LayoutArea.CENTER_RIGHT;
-                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
+                    int leftDist = groupRect.getX() - screenRect.getX();
+                    int rightDist = groupRect.getX1() - screenRect.getX1();
+
+                    boolean leftStick = leftDist % SLOT_SIZE == 0;
+                    boolean rightStick = rightDist % SLOT_SIZE == 0;
+
+                    if (leftStick == rightStick) {
+                        if (leftDist <= rightDist) {
+                            saveGroup.horizontal = leftDist;
+                        } else {
+                            dockLeft = false;
+                            saveGroup.horizontal = rightDist - groupRect.getWidth();
+                        }
+                    } else if (leftStick) {
+                        saveGroup.horizontal = leftDist;
+                    } else {
+                        dockLeft = false;
+                        saveGroup.horizontal = rightDist - groupRect.getWidth();
+                    }
                 }
+            }
+
+            if (dockTop && dockLeft) {
+                saveGroup.area = CoinSaveState.LayoutArea.TOP_LEFT;
+            } else if (dockTop) {
+                saveGroup.area = CoinSaveState.LayoutArea.TOP_RIGHT;
+            } else if (dockLeft) {
+                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_LEFT;
             } else {
-                // 中
-                saveGroup.horizontal = groupRect.getX() - screenRect.getX();
-                if (groupRect.getY1() < screenRect.getY()) {
-                    // 上
-                    saveGroup.area = CoinSaveState.LayoutArea.TOP_CENTER;
-                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
-                } else if (groupRect.getY() >= screenRect.getY1()) {
-                    // 下
-                    saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_CENTER;
-                    saveGroup.vertical = groupRect.getY() - screenRect.getY1();
-                } else {
-                    // 中
-                    saveGroup.area = CoinSaveState.LayoutArea.INVALID;
-                    saveGroup.vertical = groupRect.getY() - screenRect.getY();
-                }
+                saveGroup.area = CoinSaveState.LayoutArea.BOTTOM_RIGHT;
             }
+
             saveState.addGroup(saveGroup);
         }
 

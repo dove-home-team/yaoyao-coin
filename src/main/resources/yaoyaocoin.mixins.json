@@ -8,6 +8,7 @@
     "AbstractContainerScreenAccessor"
   ],
   "mixins": [
+    "MixinAbstractContainerMenu"
   ],
   "injectors": {
     "defaultRequire": 1

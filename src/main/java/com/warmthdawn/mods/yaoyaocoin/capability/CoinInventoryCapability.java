@@ -251,6 +251,15 @@ public class CoinInventoryCapability {
             return nbt;
         }
 
+        private void addToInvalidStacks(ItemStack sample, int count) {
+            while (count > 0) {
+                int stackSize = Math.min(count, sample.getMaxStackSize());
+                ItemStack stack = ItemHandlerHelper.copyStackWithSize(sample, stackSize);
+                invalidStacks.add(stack);
+                count -= stackSize;
+            }
+        }
+
         @Override
         public void deserializeNBT(Tag nbt) {
             if (!(nbt instanceof CompoundTag tag)) {
@@ -273,25 +282,21 @@ public class CoinInventoryCapability {
                 CoinType type = manager.findCoinType(key);
                 if (type == null) {
                     YaoYaoCoin.LOGGER.warn("Invalid coin type: {}", key);
-                    while (count > 0) {
-                        int stackSize = Math.min(count, sample.getMaxStackSize());
-                        ItemStack stack = ItemHandlerHelper.copyStackWithSize(sample, stackSize);
-                        invalidStacks.add(stack);
-                        count -= stackSize;
-                    }
+                    addToInvalidStacks(sample, count);
                     continue;
                 }
 
                 if (!type.matches(sample)) {
                     YaoYaoCoin.LOGGER.warn("Invalid coin stack: {}", sample);
-
-                    while (count > 0) {
-                        int stackSize = Math.min(count, sample.getMaxStackSize());
-                        ItemStack stack = ItemHandlerHelper.copyStackWithSize(sample, stackSize);
-                        invalidStacks.add(stack);
-                        count -= stackSize;
-                    }
+                    addToInvalidStacks(sample, count);
                     continue;
+                }
+
+                if(count > type.maxStackSize()) {
+                    YaoYaoCoin.LOGGER.warn("Coin count exceeds max stack size: {}", count);
+                    int overflow = count - type.maxStackSize();
+                    addToInvalidStacks(sample, overflow);
+                    count = type.maxStackSize();
                 }
 
                 int slot = type.id();

@@ -241,7 +241,7 @@ public class CoinManager {
 
             int takenRemaining = (int) (remaining / coins[takenIndex]);
             remainingFromTaken -= (long) takenRemaining * coins[takenIndex];
-
+            count[takenIndex] = takenRemaining;
             for (int i = takenIndex - 1; i > 0; i--) {
                 int maxTake = count[i];
                 int coinValue = coins[i];

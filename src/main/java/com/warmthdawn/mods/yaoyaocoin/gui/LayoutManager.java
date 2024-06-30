@@ -343,7 +343,8 @@ public class LayoutManager {
                     groupA.endUpdate();
                 }
             } else {
-                boolean modified = CoinSlotGroup.combineGroups(list, SLOT_SIZE);
+                List<CoinSlotGroup> added = new ArrayList<>();
+                boolean modified = CoinSlotGroup.combineGroups(list, added, SLOT_SIZE);
                 if (modified) {
                     changed = true;
                     for (CoinSlotGroup group : list) {
@@ -351,6 +352,10 @@ public class LayoutManager {
                             groups.remove(group);
                         }
                     }
+                }
+                if (!added.isEmpty()) {
+                    groups.addAll(added);
+                    changed = true;
                 }
             }
         }
@@ -446,7 +451,7 @@ public class LayoutManager {
             }
             slotGroup.endUpdate();
 
-            if (slotGroup.empty()) {
+            if (slotGroup.empty() || slotGroup.isDiscard()) {
                 continue;
             }
 

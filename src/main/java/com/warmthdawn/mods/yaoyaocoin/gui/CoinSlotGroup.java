@@ -128,6 +128,10 @@ public class CoinSlotGroup {
 
 
     private void rebuildSlotGrid() {
+        if (slots.isEmpty()) {
+            this.discardGroup();
+            return;
+        }
         int maxGridX = Integer.MIN_VALUE;
         int maxGridY = Integer.MIN_VALUE;
         int minGridX = Integer.MAX_VALUE;
@@ -188,7 +192,6 @@ public class CoinSlotGroup {
         for (int i = 0; i < slots.size(); i++) {
             slotIdToIndex.put(slots.get(i).slotId, i);
         }
-
         needsRebuild = false;
     }
 
@@ -210,6 +213,10 @@ public class CoinSlotGroup {
     private static final boolean[] TRUE_AND_FALSE = new boolean[]{true, false};
 
     private void computeCollisionRects() {
+        collisionRects.clear();
+        if (isDiscard()) {
+            return;
+        }
         collisionRects.clear();
         boolean[][] visitedColl = new boolean[gridHeight][gridWidth];
 
@@ -547,7 +554,7 @@ public class CoinSlotGroup {
 
     }
 
-    public static boolean combineGroups(List<CoinSlotGroup> groups, int slotSize) {
+    public static boolean combineGroups(List<CoinSlotGroup> groups, List<CoinSlotGroup> additional, int slotSize) {
 
         HashMap<Vector2i, Integer> slotMap = new HashMap<>();
         CoinManager manager = CoinManager.getInstance();
@@ -559,6 +566,9 @@ public class CoinSlotGroup {
 
         for (int i = 0; i < groups.size(); i++) {
             CoinSlotGroup group = groups.get(i);
+            if (group.isDiscard()) {
+                continue;
+            }
             minX = Math.min(minX, group.groupX);
             minY = Math.min(minY, group.groupY);
 
@@ -569,21 +579,14 @@ public class CoinSlotGroup {
                 slotGroupMap[entry.slotId] = i;
             }
         }
-
-        CoinSlotGroup invalidGroup = new CoinSlotGroup();
-
-        invalidGroup.setGroupX(minX - slotSize - 10);
-        invalidGroup.setGroupY(minY);
-
-        int invalidCount = 0;
-        invalidGroup.beginUpdate();
-
         UnionFind unionFind = new UnionFind(groups.size());
 
         int xStart = Integer.MAX_VALUE;
         int yStart = Integer.MAX_VALUE;
         int xEnd = Integer.MIN_VALUE;
         int yEnd = Integer.MIN_VALUE;
+
+        IntList invalidSlots = new IntArrayList();
 
 //        for (CoinSlotGroup group : groups) {
         for (int i = 0; i < groups.size(); i++) {
@@ -593,6 +596,7 @@ public class CoinSlotGroup {
 
             assert ((group.groupX - minX) % slotSize == 0);
             assert ((group.groupY - minY) % slotSize == 0);
+
 
             for (Entry entry : group.slots) {
                 if (entry.isBorrowed) {
@@ -612,14 +616,36 @@ public class CoinSlotGroup {
                         continue;
                     }
 
-                    invalidGroup.takeSlot(slotId, groups.get(groupId));
-                    invalidCount++;
+                    invalidSlots.add(entry.slotId);
 
 
                 } else {
                     slotMap.put(pos, entry.slotId);
                 }
             }
+        }
+
+        if (!invalidSlots.isEmpty()) {
+
+            CoinSlotGroup invalidGroup = new CoinSlotGroup();
+            invalidGroup.setGroupX(minX - slotSize - 10);
+            invalidGroup.setGroupY(minY);
+
+            invalidGroup.beginUpdate();
+
+            for (int i = 0; i < invalidSlots.size(); i++) {
+                int slotId = invalidSlots.getInt(i);
+                int groupId = slotGroupMap[slotId];
+                CoinSlotGroup group = groups.get(groupId);
+                invalidGroup.takeSlot(slotId, group);
+            }
+
+            for (int i = 0; i < invalidSlots.size(); i++) {
+                Entry entry = invalidGroup.slots.get(i);
+                invalidGroup.slots.set(i, new Entry(0, i, entry.slotId, false));
+            }
+            invalidGroup.endUpdate();
+            additional.add(invalidGroup);
         }
 
 
@@ -655,6 +681,9 @@ public class CoinSlotGroup {
 
         Int2ObjectOpenHashMap<List<CoinSlotGroup>> groupMap = new Int2ObjectOpenHashMap<>();
         for (int i = 0; i < groups.size(); i++) {
+            if (groups.get(i).isDiscard()) {
+                continue;
+            }
             int g = unionFind.find(i);
             groupMap.computeIfAbsent(g, it -> new ArrayList<>()).add(groups.get(i));
         }
@@ -705,16 +734,6 @@ public class CoinSlotGroup {
             first.endUpdate();
 
         }
-
-        if (invalidCount > 0) {
-            for (int i = 0; i < invalidCount; i++) {
-                Entry entry = invalidGroup.slots.get(i);
-                invalidGroup.slots.set(i, new Entry(0, i, entry.slotId, false));
-            }
-            invalidGroup.endUpdate();
-            groups.add(invalidGroup);
-        }
-
 
         return modified;
 

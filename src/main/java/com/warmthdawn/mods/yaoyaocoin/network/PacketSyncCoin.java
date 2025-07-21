@@ -70,10 +70,7 @@ public record PacketSyncCoin(
 
 
     public void messageConsumer(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            updateClient();
-        });
-        ctx.get().setPacketHandled(true);
+        updateClient();
     }
 
 

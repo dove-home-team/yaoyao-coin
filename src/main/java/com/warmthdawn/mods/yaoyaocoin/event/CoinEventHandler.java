@@ -24,7 +24,7 @@ import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.OnDatapackSyncEvent;
-import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -44,7 +44,7 @@ public class CoinEventHandler {
 
     @SubscribeEvent
     public static void playerPickup(EntityItemPickupEvent event) {
-        Player player = event.getPlayer();
+        Player player = event.getEntity();
         ItemEntity itemEntity = event.getItem();
         ItemStack stack = itemEntity.getItem();
 
@@ -80,8 +80,8 @@ public class CoinEventHandler {
 
             itemEntity.setItem(remainingStack.get());
             event.setCanceled(true);
-            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.getConnection(), NetworkDirection.PLAY_TO_CLIENT);
-            playPickupSound(player.level, serverPlayer);
+            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+            playPickupSound(player.level(), serverPlayer);
         }
 
 
@@ -94,16 +94,16 @@ public class CoinEventHandler {
 
     @SubscribeEvent
     public static void playerChangeDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
-        Player player = event.getPlayer();
+        Player player = event.getEntity();
         if (player instanceof ServerPlayer serverPlayer) {
-            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.getConnection(), NetworkDirection.PLAY_TO_CLIENT);
+            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
         }
     }
 
     @SubscribeEvent
     public static void playerClone(PlayerEvent.Clone event) {
         Player oldPlayer = event.getOriginal();
-        Player newPlayer = event.getPlayer();
+        Player newPlayer = event.getEntity();
 
 
         oldPlayer.revive();
@@ -135,7 +135,7 @@ public class CoinEventHandler {
 
 
         boolean keepInventory =
-                livingEntity.getLevel().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY);
+                livingEntity.level().getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY);
 
 
         if (!keepInventory) {
@@ -159,12 +159,12 @@ public class CoinEventHandler {
     }
 
     @SubscribeEvent
-    public static void playerJoin(EntityJoinWorldEvent event) {
+    public static void playerJoin(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
             return;
         }
 
-        if (event.getWorld().isClientSide) {
+        if (event.getLevel().isClientSide) {
             return;
         }
 
@@ -186,9 +186,9 @@ public class CoinEventHandler {
 
     @SubscribeEvent
     public static void playerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
-        Player player = event.getPlayer();
+        Player player = event.getEntity();
         if (player instanceof ServerPlayer serverPlayer) {
-            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.getConnection(), NetworkDirection.PLAY_TO_CLIENT);
+            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
         }
     }
 

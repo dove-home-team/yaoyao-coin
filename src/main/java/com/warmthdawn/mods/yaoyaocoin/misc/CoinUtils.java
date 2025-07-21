@@ -17,6 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.ItemHandlerHelper;
+import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Set;
 
@@ -45,7 +46,7 @@ public class CoinUtils {
     });
 
     public static boolean mayCoinItem(ItemStack stack) {
-        return playerCoinSet.get().contains(stack.getItem().getRegistryName());
+        return playerCoinSet.get().contains(ForgeRegistries.ITEMS.getKey(stack.getItem()));
     }
 
 

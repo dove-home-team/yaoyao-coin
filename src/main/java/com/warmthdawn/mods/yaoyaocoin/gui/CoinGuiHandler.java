@@ -10,7 +10,7 @@ import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.mixin.AbstractContainerScreenAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.client.ItemDecoratorHandler;
 import net.minecraftforge.client.event.ContainerScreenEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -27,7 +28,7 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class CoinGuiHandler extends GuiComponent {
+public class CoinGuiHandler {
 
     private final LayoutManager layoutManager = new LayoutManager();
     private static final int SLOT_SIZE = 20;
@@ -61,7 +62,7 @@ public class CoinGuiHandler extends GuiComponent {
     private Rectangle2i guiInnerBounds = new Rectangle2i(0, 0, 0, 0);
 
 
-    private void onMouseRelease(ScreenEvent.MouseReleasedEvent.Pre event) {
+    private void onMouseRelease(ScreenEvent.MouseButtonReleased.Pre event) {
         if (!enabled) {
             return;
         }
@@ -92,7 +93,7 @@ public class CoinGuiHandler extends GuiComponent {
         prevDraggingY = 0;
     }
 
-    private void onMouseClick(ScreenEvent.MouseClickedEvent.Pre event) {
+    private void onMouseClick(ScreenEvent.MouseButtonPressed.Pre event) {
         if (!enabled) {
             return;
         }
@@ -165,7 +166,7 @@ public class CoinGuiHandler extends GuiComponent {
     }
 
 
-    public void onInit(ScreenEvent.InitScreenEvent.Post event) {
+    public void onInit(ScreenEvent.Init.Post event) {
 
         if (event.getScreen() instanceof AbstractContainerScreen<?> screen && isSupportedScreen(screen)) {
             layoutManager.init(screen);
@@ -189,22 +190,21 @@ public class CoinGuiHandler extends GuiComponent {
         this.ignoreMouseUp = false;
     }
 
-    public void onDrawBackground(ContainerScreenEvent.DrawBackground event) {
+    public void onDrawBackground(ContainerScreenEvent.Render.Background event) {
         if (!enabled) {
             return;
         }
         // BindTexture
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        RenderSystem.setShaderTexture(0, GuiTextures.COIN_SLOT);
+//        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+//        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+//        RenderSystem.setShaderTexture(0, GuiTextures.COIN_SLOT);
 
-        PoseStack poseStack = event.getPoseStack();
         for (CoinSlotGroup group : layoutManager.getGroups()) {
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
             for (int i = -1; i <= group.getGridHeight(); i++) {
                 for (int j = -1; j <= group.getGridWidth(); j++) {
-                    drawSlot(poseStack, group, x0 + j * 20, y0 + i * 20, j, i);
+                    drawSlot(event.getGuiGraphics(), group, x0 + j * 20, y0 + i * 20, j, i, 0);
                 }
             }
         }
@@ -224,7 +224,7 @@ public class CoinGuiHandler extends GuiComponent {
         layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy));
     }
 
-    public void onDrawForeground(ContainerScreenEvent.DrawForeground event) {
+    public void onDrawForeground(ContainerScreenEvent.Render.Foreground event) {
 
         if (!enabled) {
             return;
@@ -281,7 +281,6 @@ public class CoinGuiHandler extends GuiComponent {
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
 
-            event.getContainerScreen().setBlitOffset(100);
             group.iterateSlots((gridX, gridY, slot, isBorrowed) -> {
                 // draw items
                 if (isBorrowed) {
@@ -300,11 +299,10 @@ public class CoinGuiHandler extends GuiComponent {
                 int x = x0 + gridX * 20 + 2;
                 int y = y0 + gridY * 20 + 2;
 
-                drawSlotItem(event.getPoseStack(), x, y, stack, count);
+                drawSlotItem(event.getGuiGraphics(), x, y, stack, count);
 
             });
 
-            event.getContainerScreen().setBlitOffset(0);
 
         }
 
@@ -317,38 +315,33 @@ public class CoinGuiHandler extends GuiComponent {
             int gridY = group.getSlotY(hoveringSlot.getId());
             int x = x0 + gridX * 20 + 2;
             int y = y0 + gridY * 20 + 2;
-            AbstractContainerScreen.renderSlotHighlight(event.getPoseStack(), x, y, screen.getBlitOffset(), SLOT_COLOR);
+            AbstractContainerScreen.renderSlotHighlight(event.getGuiGraphics(), x, y, 0, SLOT_COLOR);
         }
 
         renderPoseStack.popPose();
         RenderSystem.applyModelViewMatrix();
     }
 
-    private void drawSlotItem(PoseStack poseStack, int x, int y, ItemStack stack, int count) {
-        ItemRenderer itemRenderer = Minecraft.getInstance().getItemRenderer();
+    private void drawSlotItem(GuiGraphics graphics, int x, int y, ItemStack stack, int count) {
         Minecraft minecraft = Minecraft.getInstance();
-        itemRenderer.blitOffset = 100.0F;
 
-        RenderSystem.enableDepthTest();
-        itemRenderer.renderAndDecorateItem(stack, x, y);
+        graphics.renderItem(stack, x, y, 114514, 100);
         // use smaller font if count is too large
         Font font = minecraft.font;
 
-        poseStack.pushPose();
+        graphics.pose().pushPose();
         String s = String.valueOf(count);
-        poseStack.translate(x + 18, y + 18, 300.0D);
+        graphics.pose().translate(x + 18, y + 18, 300.0D);
         if (count > 999) {
-            poseStack.scale(0.6F, 0.6F, 0.6F);
+            graphics.pose().scale(0.6F, 0.6F, 0.6F);
         } else if (count > 99) {
-            poseStack.scale(0.8F, 0.8F, 0.8F);
+            graphics.pose().scale(0.8F, 0.8F, 0.8F);
         }
-        MultiBufferSource.BufferSource multibuffersource$buffersource = MultiBufferSource.immediate(Tesselator.getInstance().getBuilder());
-        font.drawInBatch(s, (float) (-font.width(s) - 1), -font.lineHeight, 0x00FFFFFF, true, poseStack.last().pose(), multibuffersource$buffersource, false, 0, 0xF000F0);
-        multibuffersource$buffersource.endBatch();
-//        itemRenderer.renderGuiItemDecorations(minecraft.font, stack, x, y, );
 
-        poseStack.popPose();
-        itemRenderer.blitOffset = 0.0F;
+        graphics.drawString(font, s, (float) (-font.width(s) - 1), -font.lineHeight, 0x00FFFFFF, true);
+        ItemDecoratorHandler.of(stack).render(graphics, font, stack, x, y);
+
+        graphics.pose().popPose();
 
 
     }
@@ -440,14 +433,14 @@ public class CoinGuiHandler extends GuiComponent {
         return SlotKind.Empty;
     }
 
-    private void drawSlot(PoseStack poseStack, CoinSlotGroup group, int x0, int y0, int slotX, int slotY) {
+    private void drawSlot(GuiGraphics graphics, CoinSlotGroup group, int x0, int y0, int slotX, int slotY, int blitOffset) {
         boolean hasSlot = group.hasSlot(slotX, slotY);
 
         int x = x0;
         int y = y0;
 
         if (hasSlot) {
-            drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.FILL);
+            drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.FILL);
             return;
         }
 
@@ -468,17 +461,17 @@ public class CoinGuiHandler extends GuiComponent {
                     if (left != SlotKind.Virtual || up != SlotKind.Virtual) {
                         int xWidth = up == SlotKind.Real ? 10 : 4;
                         int yHeight = left == SlotKind.Real ? 10 : 4;
-                        drawSlotPart(poseStack, x, y, 0, 0, xWidth, yHeight, GuiTextures.SlotPart.TOP_LEFT_3);
+                        drawSlotPart(graphics, x, y, 0, 0, xWidth, yHeight, blitOffset, GuiTextures.SlotPart.TOP_LEFT_3);
                     }
                 } else if (up == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.TOP_2);
                 }
             } else if (left != SlotKind.Empty) {
                 if (left == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.LEFT_2);
                 }
             } else if (upLeft) {
-                drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_LEFT_1);
+                drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.TOP_LEFT_1);
             }
         }
 
@@ -493,17 +486,17 @@ public class CoinGuiHandler extends GuiComponent {
                         // top has slot and right has slot
                         int xWidth = up == SlotKind.Real ? 10 : 4;
                         int yHeight = right == SlotKind.Real ? 10 : 4;
-                        drawSlotPart(poseStack, x, y, 10 - xWidth, 0, xWidth, yHeight, GuiTextures.SlotPart.TOP_RIGHT_3);
+                        drawSlotPart(graphics, x, y, 10 - xWidth, 0, xWidth, yHeight, blitOffset, GuiTextures.SlotPart.TOP_RIGHT_3);
                     }
                 } else if (up == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.TOP_2);
                 }
             } else if (right != SlotKind.Empty) {
                 if (right == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.RIGHT_2);
                 }
             } else if (upRight) {
-                drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.TOP_RIGHT_1);
+                drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.TOP_RIGHT_1);
             }
         }
 
@@ -519,17 +512,17 @@ public class CoinGuiHandler extends GuiComponent {
                     if (left != SlotKind.Virtual || down != SlotKind.Virtual) {
                         int xWidth = down == SlotKind.Real ? 10 : 4;
                         int yHeight = left == SlotKind.Real ? 10 : 4;
-                        drawSlotPart(poseStack, x, y, 0, 10 - yHeight, xWidth, yHeight, GuiTextures.SlotPart.BOTTOM_LEFT_3);
+                        drawSlotPart(graphics, x, y, 0, 10 - yHeight, xWidth, yHeight, blitOffset, GuiTextures.SlotPart.BOTTOM_LEFT_3);
                     }
                 } else if (down == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.BOTTOM_2);
                 }
             } else if (left != SlotKind.Empty) {
                 if (left == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.LEFT_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.LEFT_2);
                 }
             } else if (bottomLeft) {
-                drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_LEFT_1);
+                drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.BOTTOM_LEFT_1);
             }
         }
 
@@ -547,17 +540,17 @@ public class CoinGuiHandler extends GuiComponent {
                     if (right != SlotKind.Virtual || down != SlotKind.Virtual) {
                         int xWidth = down == SlotKind.Real ? 10 : 4;
                         int yHeight = right == SlotKind.Real ? 10 : 4;
-                        drawSlotPart(poseStack, x, y, 10 - xWidth, 10 - yHeight, xWidth, yHeight, GuiTextures.SlotPart.BOTTOM_RIGHT_3);
+                        drawSlotPart(graphics, x, y, 10 - xWidth, 10 - yHeight, xWidth, yHeight, blitOffset, GuiTextures.SlotPart.BOTTOM_RIGHT_3);
                     }
                 } else if (down == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.BOTTOM_2);
                 }
             } else if (right != SlotKind.Empty) {
                 if (right == SlotKind.Real) {
-                    drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.RIGHT_2);
+                    drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.RIGHT_2);
                 }
             } else if (bottomRight) {
-                drawSlotPart(poseStack, x, y, GuiTextures.SlotPart.BOTTOM_RIGHT_1);
+                drawSlotPart(graphics, x, y, blitOffset, GuiTextures.SlotPart.BOTTOM_RIGHT_1);
             }
         }
 
@@ -565,12 +558,12 @@ public class CoinGuiHandler extends GuiComponent {
     }
 
 
-    private void drawSlotPart(PoseStack poseStack, int x, int y, int xOff, int yOff, int width, int height, GuiTextures.SlotPart part) {
-        blit(poseStack, x + xOff, y + yOff, this.getBlitOffset(), part.uOffset + xOff, part.vOffset + yOff, width, height, 40, 40);
+    private void drawSlotPart(GuiGraphics graphics, int x, int y, int xOff, int yOff, int width, int height, int blitOffset, GuiTextures.SlotPart part) {
+        graphics.blit(GuiTextures.COIN_SLOT, x + xOff, y + yOff, blitOffset, part.uOffset + xOff, part.vOffset + yOff, width, height, 40, 40);
     }
 
-    private void drawSlotPart(PoseStack poseStack, int x, int y, GuiTextures.SlotPart part) {
-        blit(poseStack, x, y, this.getBlitOffset(), part.uOffset, part.vOffset, part.uWidth, part.vHeight, 40, 40);
+    private void drawSlotPart(GuiGraphics graphics, int x, int y, int blitOffset, GuiTextures.SlotPart part) {
+        graphics.blit(GuiTextures.COIN_SLOT, x, y, blitOffset, part.uOffset, part.vOffset, part.uWidth, part.vHeight, 40, 40);
     }
 
 

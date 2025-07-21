@@ -1,9 +1,11 @@
 package com.warmthdawn.mods.yaoyaocoin.data;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.items.ItemStackHandler;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Objects;
@@ -22,8 +24,7 @@ public record CoinType(
         if (stack.isEmpty()) {
             return false;
         }
-
-        if (Objects.equals(stack.getItem().getRegistryName(), itemName)) {
+        if (Objects.equals(ForgeRegistries.ITEMS.getKey(stack.getItem()), itemName)) {
             return true;
         }
 

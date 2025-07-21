@@ -64,7 +64,7 @@ public abstract class MixinAbstractContainerMenu {
 
             this.slots.get(pSlotId).set(remainingStack.get());
             this.slots.get(pSlotId).setChanged();
-            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(pPlayer), serverPlayer.connection.getConnection(), NetworkDirection.PLAY_TO_CLIENT);
+            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(pPlayer), serverPlayer.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
         }
 
     }

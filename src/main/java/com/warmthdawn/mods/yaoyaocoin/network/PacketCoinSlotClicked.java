@@ -32,20 +32,17 @@ public record PacketCoinSlotClicked(
 
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            Player player = ctx.get().getSender();
-            if (player == null) {
-                return;
-            }
+        Player player = ctx.get().getSender();
+        if (player == null) {
+            return;
+        }
 
-            ItemStack actualMouseItem = player.containerMenu.getCarried();
-            if (!ItemStack.matches(actualMouseItem, this.stack)) {
-                return;
-            }
+        ItemStack actualMouseItem = player.containerMenu.getCarried();
+        if (!ItemStack.matches(actualMouseItem, this.stack)) {
+            return;
+        }
 
-            CoinUtils.handleSlotClickServer(this.slotId, this.clickType, actualMouseItem, this.autoTransform, player);
+        CoinUtils.handleSlotClickServer(this.slotId, this.clickType, actualMouseItem, this.autoTransform, player);
 
-        });
-        ctx.get().setPacketHandled(true);
     }
 }

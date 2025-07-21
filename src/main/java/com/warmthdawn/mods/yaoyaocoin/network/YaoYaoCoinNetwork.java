@@ -20,13 +20,13 @@ public class YaoYaoCoinNetwork {
         INSTANCE.messageBuilder(PacketSyncCoin.class, id++)
                 .encoder(PacketSyncCoin::encoder)
                 .decoder(PacketSyncCoin::decoder)
-                .consumer(PacketSyncCoin::messageConsumer)
+                .consumerMainThread(PacketSyncCoin::messageConsumer)
                 .add();
 
         INSTANCE.messageBuilder(PacketCoinSlotClicked.class, id++)
                 .encoder(PacketCoinSlotClicked::encoder)
                 .decoder(PacketCoinSlotClicked::decoder)
-                .consumer(PacketCoinSlotClicked::handle)
+                .consumerMainThread(PacketCoinSlotClicked::handle)
                 .add();
 
     }

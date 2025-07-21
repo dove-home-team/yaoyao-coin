@@ -8,8 +8,10 @@ import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.gui.ClientCoinStorage;
 import com.warmthdawn.mods.yaoyaocoin.gui.CoinSlot;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketCoinSlotClicked;
+import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoin;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
@@ -17,9 +19,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.ItemHandlerHelper;
+import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class CoinUtils {
 
@@ -49,6 +54,73 @@ public class CoinUtils {
         return playerCoinSet.get().contains(ForgeRegistries.ITEMS.getKey(stack.getItem()));
     }
 
+    public static Optional<ItemStack> insertCoin(Player player, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return Optional.empty();
+        }
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return Optional.empty();
+        }
+        if (!CoinUtils.mayCoinItem(stack)) {
+            return Optional.empty();
+        }
+
+        AtomicReference<ItemStack> restStackSimulated = new AtomicReference<>(stack.copy());
+
+        LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
+
+        inventory.ifPresent(inv -> {
+            ItemStack rest = ItemHandlerHelper.insertItem(inv, restStackSimulated.get(), true);
+            restStackSimulated.set(rest);
+        });
+
+        if (restStackSimulated.get().getCount() != stack.getCount()) {
+            AtomicReference<ItemStack> remainingStack = new AtomicReference<>(stack.copy());
+            inventory.ifPresent(inv -> {
+                ItemStack rest = ItemHandlerHelper.insertItem(inv, remainingStack.get(), false);
+
+                remainingStack.set(rest);
+            });
+
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(player));
+            return Optional.of(remainingStack.get());
+        }
+
+        return Optional.empty();
+
+    }
+
+    public static ItemStack extractCoin(Player player, ItemStack stack, int count, boolean autoTransform) {
+        if (stack.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+
+
+        LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
+
+        return inventory.map(inv -> {
+
+            // find slot id
+            for(int slotId = 0; slotId < inv.getSlots(); slotId++) {
+                ItemStack sampleStack = inv.getSampleStack(slotId);
+                if(!ItemStack.isSameItemSameTags(stack, sampleStack)) {
+                    continue;
+                }
+                ItemStack pickedStack = ItemStack.EMPTY;
+                if (autoTransform) {
+                    pickedStack = CoinUtils.extractCoinAutoTransform(inv, slotId, count, player);
+                } else {
+                    pickedStack = inv.extractItem(slotId, count, false);
+                }
+
+                return pickedStack;
+            }
+
+            return ItemStack.EMPTY;
+        }).orElse(ItemStack.EMPTY);
+
+
+    }
 
 
     public static ItemStack extractCoinAutoTransform(CoinInventoryCapability.CoinInventory inv, int slotId, int count, Player player) {

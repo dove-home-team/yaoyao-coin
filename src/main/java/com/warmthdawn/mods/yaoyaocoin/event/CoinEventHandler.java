@@ -24,11 +24,9 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.items.ItemHandlerHelper;
-import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nonnull;
-import java.util.concurrent.atomic.AtomicReference;
 
 
 @Mod.EventBusSubscriber
@@ -48,34 +46,11 @@ public class CoinEventHandler {
             return;
         }
 
-        if (!CoinUtils.mayCoinItem(stack)) {
-            return;
-        }
-
-        AtomicReference<ItemStack> restStackSimulated = new AtomicReference<>(stack.copy());
-
-        LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
-
-
-        inventory.ifPresent(inv -> {
-            ItemStack rest = ItemHandlerHelper.insertItem(inv, restStackSimulated.get(), true);
-            restStackSimulated.set(rest);
-        });
-
-        if (restStackSimulated.get().getCount() != stack.getCount()) {
-            AtomicReference<ItemStack> remainingStack = new AtomicReference<>(itemEntity.getItem().copy());
-            inventory.ifPresent(inv -> {
-                ItemStack rest = ItemHandlerHelper.insertItem(inv, remainingStack.get(), false);
-
-                remainingStack.set(rest);
-            });
-
-            itemEntity.setItem(remainingStack.get());
+        CoinUtils.insertCoin(player, stack).ifPresent(remaining -> {
+            itemEntity.setItem(remaining);
             event.setCanceled(true);
-            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(player));
             playPickupSound(player.level(), serverPlayer);
-        }
-
+        });
 
     }
 

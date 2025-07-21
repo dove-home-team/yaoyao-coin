@@ -8,7 +8,9 @@
     "AbstractContainerScreenAccessor"
   ],
   "mixins": [
-    "MixinAbstractContainerMenu"
+    "MixinAbstractContainerMenu",
+    "MixinInventory",
+    "MixinMerchantMenu"
   ],
   "injectors": {
     "defaultRequire": 1

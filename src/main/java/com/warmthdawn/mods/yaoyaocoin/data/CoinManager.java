@@ -2,9 +2,11 @@ package com.warmthdawn.mods.yaoyaocoin.data;
 
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
+import net.minecraft.advancements.critereon.ItemPredicate;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
 
 import java.util.*;
@@ -83,7 +85,6 @@ public class CoinManager {
         }
         return null;
     }
-
 
     public CoinType getCoinType(int id) {
         if (id < 0 || id >= coinTypes.size()) {

@@ -10,7 +10,9 @@
   "mixins": [
     "MixinAbstractContainerMenu",
     "MixinInventory",
-    "MixinMerchantMenu"
+    "MixinMerchantMenu",
+    "MixinServerPlayer",
+    "com.warmthdawn.mods.yaoyaocoin.misc.CoinPlayerExt"
   ],
   "injectors": {
     "defaultRequire": 1

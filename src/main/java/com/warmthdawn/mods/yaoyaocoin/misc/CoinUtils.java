@@ -43,7 +43,7 @@ public class CoinUtils {
     private static final Lazy<Set<ResourceLocation>> playerCoinSet = Lazy.of(() -> {
         ImmutableSet.Builder<ResourceLocation> builder = ImmutableSet.builder();
 
-        for(int i = 0; i < CoinManager.getInstance().getCoinTypeCount(); i++) {
+        for (int i = 0; i < CoinManager.getInstance().getCoinTypeCount(); i++) {
             CoinType coinType = CoinManager.getInstance().getCoinType(i);
             builder.add(coinType.itemName());
         }
@@ -90,6 +90,34 @@ public class CoinUtils {
 
     }
 
+
+    public static ItemStack extractCoin(Player player, String coinName, int count, boolean autoTransform) {
+
+
+        CoinManager manager = CoinManager.getInstance();
+        CoinType type = manager.findCoinType(coinName);
+        if (type == null) {
+            return ItemStack.EMPTY;
+        }
+
+        LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
+
+        return inventory.map(inv -> {
+            int slotId = type.id();
+            // find slot id
+            ItemStack pickedStack = ItemStack.EMPTY;
+            if (autoTransform) {
+                pickedStack = CoinUtils.extractCoinAutoTransform(inv, slotId, count, player);
+            } else {
+                pickedStack = inv.extractItem(slotId, count, false);
+            }
+
+            return pickedStack;
+        }).orElse(ItemStack.EMPTY);
+
+
+    }
+
     public static ItemStack extractCoin(Player player, ItemStack stack, int count, boolean autoTransform) {
         if (stack.isEmpty()) {
             return ItemStack.EMPTY;
@@ -101,9 +129,9 @@ public class CoinUtils {
         return inventory.map(inv -> {
 
             // find slot id
-            for(int slotId = 0; slotId < inv.getSlots(); slotId++) {
+            for (int slotId = 0; slotId < inv.getSlots(); slotId++) {
                 ItemStack sampleStack = inv.getSampleStack(slotId);
-                if(!ItemStack.isSameItemSameTags(stack, sampleStack)) {
+                if (!ItemStack.isSameItemSameTags(stack, sampleStack)) {
                     continue;
                 }
                 ItemStack pickedStack = ItemStack.EMPTY;

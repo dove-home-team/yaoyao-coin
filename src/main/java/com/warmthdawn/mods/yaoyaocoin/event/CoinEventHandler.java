@@ -1,16 +1,11 @@
 package com.warmthdawn.mods.yaoyaocoin.event;
 
-import com.google.common.collect.ImmutableSet;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
-import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
-import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoin;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.players.PlayerList;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
@@ -20,22 +15,19 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.OnDatapackSyncEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.items.ItemHandlerHelper;
 import net.minecraftforge.network.NetworkDirection;
+import net.minecraftforge.network.PacketDistributor;
 
 import javax.annotation.Nonnull;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 
@@ -52,11 +44,11 @@ public class CoinEventHandler {
             return;
         }
 
-        if(!(player instanceof ServerPlayer serverPlayer)) {
+        if (!(player instanceof ServerPlayer serverPlayer)) {
             return;
         }
 
-        if(!CoinUtils.mayCoinItem(stack)) {
+        if (!CoinUtils.mayCoinItem(stack)) {
             return;
         }
 
@@ -70,7 +62,7 @@ public class CoinEventHandler {
             restStackSimulated.set(rest);
         });
 
-        if(restStackSimulated.get().getCount() != stack.getCount()) {
+        if (restStackSimulated.get().getCount() != stack.getCount()) {
             AtomicReference<ItemStack> remainingStack = new AtomicReference<>(itemEntity.getItem().copy());
             inventory.ifPresent(inv -> {
                 ItemStack rest = ItemHandlerHelper.insertItem(inv, remainingStack.get(), false);
@@ -80,7 +72,7 @@ public class CoinEventHandler {
 
             itemEntity.setItem(remainingStack.get());
             event.setCanceled(true);
-            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(player));
             playPickupSound(player.level(), serverPlayer);
         }
 
@@ -96,7 +88,7 @@ public class CoinEventHandler {
     public static void playerChangeDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
         Player player = event.getEntity();
         if (player instanceof ServerPlayer serverPlayer) {
-            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(player));
         }
     }
 
@@ -178,7 +170,6 @@ public class CoinEventHandler {
             });
 
 
-
             inv.getInvalidStacks().clear();
         });
 
@@ -188,7 +179,7 @@ public class CoinEventHandler {
     public static void playerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         Player player = event.getEntity();
         if (player instanceof ServerPlayer serverPlayer) {
-            YaoYaoCoinNetwork.INSTANCE.sendTo(PacketSyncCoin.fromPlayer(player), serverPlayer.connection.connection, NetworkDirection.PLAY_TO_CLIENT);
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(player));
         }
     }
 

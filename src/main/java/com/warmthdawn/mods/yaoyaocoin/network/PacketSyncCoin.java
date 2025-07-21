@@ -5,6 +5,7 @@ import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.gui.ClientCoinStorage;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.network.NetworkEvent;
@@ -15,7 +16,7 @@ import java.util.function.Supplier;
 
 public record PacketSyncCoin(
         HashMap<String, Integer> coinData
-) {
+){
 
     public static PacketSyncCoin fromPlayer(Player player) {
         LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();

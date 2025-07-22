@@ -14,6 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.util.Lazy;
@@ -198,8 +199,18 @@ public class CoinUtils {
 
     }
 
+    private static int[] quickMoveRange(AbstractContainerMenu container) {
+        if (container instanceof InventoryMenu) {
+            return new int[] {9, 45};
+        }
+
+        return new int[] {0, container.slots.size()};
+    }
+
     private static int handleQuickMove(ItemStack sample, int count, AbstractContainerMenu container) {
-        for (int i = 0; i < container.slots.size(); i++) {
+        int[] range = quickMoveRange(container);
+
+        for (int i = range[0]; i < range[1]; i++) {
             Slot slot = container.getSlot(i);
             ItemStack itemstack = slot.getItem();
             if (!itemstack.isEmpty() && ItemStack.isSameItemSameTags(sample, itemstack)) {
@@ -221,7 +232,7 @@ public class CoinUtils {
             return 0;
         }
 
-        for (int i = 0; i < container.slots.size(); i++) {
+        for (int i = range[0]; i < range[1]; i++) {
             Slot slot1 = container.getSlot(i);
             ItemStack itemstack1 = slot1.getItem();
             if (itemstack1.isEmpty() && slot1.mayPlace(sample)) {

@@ -3,6 +3,7 @@ package com.warmthdawn.mods.yaoyaocoin.data;
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
 import net.minecraft.advancements.critereon.ItemPredicate;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
@@ -40,7 +41,7 @@ public class CoinManager {
 
         for (CoinDefine.CoinType coinType : CoinDefine.instance().getCoinTypes()) {
             // convert string to tag
-            Tag tag = null;
+            CompoundTag tag = null;
 
             if (coinType.itemTag != null) {
                 try {

@@ -2,9 +2,9 @@ package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.SlotKind;
+import com.warmthdawn.mods.yaoyaocoin.event.ScreenTooltipEvent;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.mixin.AbstractContainerScreenAccessor;
@@ -16,8 +16,6 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.client.ItemDecoratorHandler;
@@ -39,6 +37,7 @@ public class CoinGuiHandler {
         modEventBus.addListener(this::onInit);
         modEventBus.addListener(this::onMouseClick);
         modEventBus.addListener(this::onMouseRelease);
+        modEventBus.addListener(this::onRenderTooltip);
 
     }
 
@@ -61,6 +60,17 @@ public class CoinGuiHandler {
     private Rectangle2i guiBounds = new Rectangle2i(0, 0, 0, 0);
     private Rectangle2i guiInnerBounds = new Rectangle2i(0, 0, 0, 0);
 
+    private void onRenderTooltip(ScreenTooltipEvent event) {
+        if (!enabled) {
+            return;
+        }
+
+        if (hoveringSlot != null) {
+            AbstractContainerScreen<?> screen = event.getContainerScreen();
+            ItemStack itemstack = this.hoveringSlot.getStack();
+            event.getGuiGraphics().renderTooltip(screen.getMinecraft().font, Screen.getTooltipFromItem(screen.getMinecraft(), itemstack), itemstack.getTooltipImage(), itemstack, event.getMouseX(), event.getMouseY());
+        }
+    }
 
     private void onMouseRelease(ScreenEvent.MouseButtonReleased.Pre event) {
         if (!enabled) {
@@ -109,6 +119,8 @@ public class CoinGuiHandler {
                 Player player = Minecraft.getInstance().player;
                 if (player != null) {
                     ItemStack mouseItem = screen.getMenu().getCarried();
+                    System.out.println(mouseItem.getTag());
+
                     boolean isRightClick = event.getButton() == 1;
 
                     boolean isShiftHolding = Screen.hasShiftDown();

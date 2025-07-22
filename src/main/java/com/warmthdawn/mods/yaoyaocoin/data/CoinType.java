@@ -1,6 +1,7 @@
 package com.warmthdawn.mods.yaoyaocoin.data;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -17,7 +18,7 @@ public record CoinType(
         int convertGroup,
         int maxStackSize,
         ResourceLocation itemName,
-        Tag itemTag
+        CompoundTag itemTag
 ) {
 
     public boolean matches(ItemStack stack) {
@@ -44,6 +45,9 @@ public record CoinType(
 
         ItemStack stack = new ItemStack(item);
         stack.setCount(1);
+        if(itemTag != null) {
+            stack.setTag(itemTag);
+        }
         return stack;
     }
 

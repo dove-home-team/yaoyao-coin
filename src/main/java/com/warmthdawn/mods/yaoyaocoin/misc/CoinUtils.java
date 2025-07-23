@@ -23,7 +23,6 @@ import net.minecraftforge.items.ItemHandlerHelper;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,17 +54,17 @@ public class CoinUtils {
         return playerCoinSet.get().contains(ForgeRegistries.ITEMS.getKey(stack.getItem()));
     }
 
-    public static Optional<ItemStack> insertCoin(Player player, ItemStack stack) {
+    public static ItemStack insertCoin(Player player, ItemStack stack) {
         if (stack.isEmpty()) {
-            return Optional.empty();
-        }
-        if (!(player instanceof ServerPlayer serverPlayer)) {
-            return Optional.empty();
+            return ItemStack.EMPTY;
         }
         if (!CoinUtils.mayCoinItem(stack)) {
-            return Optional.empty();
+            return stack;
         }
 
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return ClientCoinStorage.INSTANCE.insertCoin(stack);
+        }
         AtomicReference<ItemStack> restStackSimulated = new AtomicReference<>(stack.copy());
 
         LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
@@ -83,11 +82,10 @@ public class CoinUtils {
                 remainingStack.set(rest);
             });
 
-            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(player));
-            return Optional.of(remainingStack.get());
+            return remainingStack.get();
         }
 
-        return Optional.empty();
+        return stack;
 
     }
 
@@ -95,12 +93,15 @@ public class CoinUtils {
     public static ItemStack extractCoin(Player player, String coinName, int count, boolean autoTransform) {
 
 
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return ClientCoinStorage.INSTANCE.extractCoin(coinName, count, autoTransform);
+        }
+
         CoinManager manager = CoinManager.getInstance();
         CoinType type = manager.findCoinType(coinName);
         if (type == null) {
             return ItemStack.EMPTY;
         }
-
         LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
 
         return inventory.map(inv -> {
@@ -124,6 +125,13 @@ public class CoinUtils {
             return ItemStack.EMPTY;
         }
 
+        if (!CoinUtils.mayCoinItem(stack)) {
+            return ItemStack.EMPTY;
+        }
+
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return ClientCoinStorage.INSTANCE.extractCoin(stack, count, autoTransform);
+        }
 
         LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
 
@@ -201,10 +209,10 @@ public class CoinUtils {
 
     private static int[] quickMoveRange(AbstractContainerMenu container) {
         if (container instanceof InventoryMenu) {
-            return new int[] {9, 45};
+            return new int[]{9, 45};
         }
 
-        return new int[] {0, container.slots.size()};
+        return new int[]{0, container.slots.size()};
     }
 
     private static int handleQuickMove(ItemStack sample, int count, AbstractContainerMenu container) {

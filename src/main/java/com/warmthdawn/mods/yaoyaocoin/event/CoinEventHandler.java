@@ -1,5 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.event;
 
+import com.warmthdawn.mods.yaoyaocoin.YaoYaoCoin;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
@@ -8,10 +9,12 @@ import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.stats.Stats;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
@@ -42,22 +45,38 @@ public class CoinEventHandler {
             return;
         }
 
-        if (!(player instanceof ServerPlayer serverPlayer)) {
+        if(!CoinUtils.mayCoinItem(stack)) {
             return;
         }
 
-        CoinUtils.insertCoin(player, stack).ifPresent(remaining -> {
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+        Item item = stack.getItem();
+        ItemStack copy = stack.copy();
+        ItemStack remaining = CoinUtils.insertCoin(player, stack);
+
+        int takeAmount = copy.getCount() - remaining.getCount();
+        if(takeAmount > 0) {
+            copy.setCount(takeAmount);
             itemEntity.setItem(remaining);
+            net.minecraftforge.event.ForgeEventFactory.firePlayerItemPickupEvent(player, itemEntity, copy);
+            player.take(itemEntity, takeAmount);
+            if(remaining.isEmpty()) {
+                itemEntity.discard();
+            }
+
+            player.awardStat(Stats.ITEM_PICKED_UP.get(item), takeAmount);
+            player.onItemPickup(itemEntity);
+
             event.setCanceled(true);
-            playPickupSound(player.level(), serverPlayer);
-        });
+
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(serverPlayer));
+        }
+
 
     }
 
-    private static void playPickupSound(Level level, @Nonnull ServerPlayer player) {
-        float pitch = ((player.getRandom().nextFloat() - player.getRandom().nextFloat()) * 0.7F + 1.0F) * 2.0F;
-        level.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 0.2F, pitch);
-    }
 
     @SubscribeEvent
     public static void playerChangeDimension(PlayerEvent.PlayerChangedDimensionEvent event) {

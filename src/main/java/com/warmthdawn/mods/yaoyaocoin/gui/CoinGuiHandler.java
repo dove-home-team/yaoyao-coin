@@ -119,7 +119,6 @@ public class CoinGuiHandler {
                 Player player = Minecraft.getInstance().player;
                 if (player != null) {
                     ItemStack mouseItem = screen.getMenu().getCarried();
-                    System.out.println(mouseItem.getTag());
 
                     boolean isRightClick = event.getButton() == 1;
 

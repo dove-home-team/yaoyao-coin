@@ -26,9 +26,9 @@ public abstract class MixinInventory {
             return;
         }
 
-        CoinUtils.insertCoin(player, stack).ifPresent(remaining -> {
-            stack.setCount(remaining.getCount());
-        });
+        ItemStack remaining = CoinUtils.insertCoin(player, stack);
+        stack.setCount(remaining.getCount());
+
     }
 
 }

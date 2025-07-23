@@ -42,10 +42,12 @@ public abstract class MixinAbstractContainerMenu {
             return;
         }
 
-        CoinUtils.insertCoin(currentPlayer.get(), stack).ifPresent(remaining -> {
+        ItemStack remaining = CoinUtils.insertCoin(currentPlayer.get(), stack);
+        if (remaining.getCount() != stack.getCount()) {
             stack.setCount(remaining.getCount());
             flag_moveItemStackTo.set(true);
-        });
+        }
+
     }
 
 

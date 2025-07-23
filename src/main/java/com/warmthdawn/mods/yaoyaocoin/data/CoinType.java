@@ -25,8 +25,8 @@ public record CoinType(
         if (stack.isEmpty()) {
             return false;
         }
-        if (Objects.equals(ForgeRegistries.ITEMS.getKey(stack.getItem()), itemName)) {
-            return true;
+        if (!Objects.equals(ForgeRegistries.ITEMS.getKey(stack.getItem()), itemName)) {
+            return false;
         }
 
         if (!stack.hasTag() && itemTag == null) {

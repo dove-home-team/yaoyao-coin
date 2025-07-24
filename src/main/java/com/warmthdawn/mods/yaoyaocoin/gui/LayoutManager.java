@@ -10,6 +10,9 @@ import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.util.Tuple;
+
+import org.checkerframework.checker.units.qual.g;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -18,24 +21,24 @@ import java.util.List;
 
 public class LayoutManager {
 
-
     private final ArrayList<CoinSlotGroup> groups = new ArrayList<>();
     private final Int2IntOpenHashMap slotIdToGroupIndex = new Int2IntOpenHashMap();
+
 
     private static final int SLOT_SIZE = 20;
 
     private final Logger logger = LogUtils.getLogger();
-
+    private AbstractContainerScreen<?> screen;
 
     public LayoutManager() {
-
 
     }
 
     private Rectangle2i computeScreenRect(AbstractContainerScreen<?> screen) {
         int borderSize = 4;
 
-        Rectangle2i rect = new Rectangle2i(screen.getGuiLeft() + borderSize, screen.getGuiTop() + borderSize, screen.getXSize() - borderSize * 2, screen.getYSize() - borderSize * 2);
+        Rectangle2i rect = new Rectangle2i(screen.getGuiLeft() + borderSize, screen.getGuiTop() + borderSize,
+                screen.getXSize() - borderSize * 2, screen.getYSize() - borderSize * 2);
 
         if (screen instanceof ContainerScreen) {
             // chest has one pixel offset
@@ -48,15 +51,15 @@ public class LayoutManager {
     void clear() {
         groups.clear();
         slotIdToGroupIndex.clear();
+        screen = null;
     }
 
     public void finishMovement(AbstractContainerScreen<?> screen) {
-        computeGroupOverlap(false);
+        computeGroupOverlap(false, true);
         CoinSaveState saveState = CoinSaveState.instance();
         CoinManager manager = CoinManager.getInstance();
 
         Rectangle2i screenRect = computeScreenRect(screen);
-        ;
 
         saveState.clear();
         int id = 0;
@@ -64,6 +67,7 @@ public class LayoutManager {
             CoinSaveState.Group saveGroup = new CoinSaveState.Group();
             int groupId = id++;
             saveGroup.id = groupId;
+            saveGroup.visible = group.isVisible();
 
             group.iterateSlots((slotX, slotY, slot, borrowed) -> {
                 if (borrowed) {
@@ -79,7 +83,8 @@ public class LayoutManager {
                 saveState.addSlot(saveSlot);
 
             });
-            Rectangle2i groupRect = new Rectangle2i(group.getGroupX(), group.getGroupY(), group.getGridWidth() * SLOT_SIZE, group.getGridHeight() * SLOT_SIZE);
+            Rectangle2i groupRect = new Rectangle2i(group.getGroupX(), group.getGroupY(),
+                    group.getGridWidth() * SLOT_SIZE, group.getGridHeight() * SLOT_SIZE);
 
             boolean dockTop = true;
             boolean dockLeft = true;
@@ -201,7 +206,6 @@ public class LayoutManager {
                 stoppedY = yBottom;
             }
 
-
             // 停在最近的边界
             if (Math.abs(newX - stoppedX) < Math.abs(newY - stoppedY)) {
                 newX = stoppedX;
@@ -211,18 +215,20 @@ public class LayoutManager {
 
             }
 
-
         }
 
         if (collision) {
             // 计算吸附
-            Rectangle2i groupRect = new Rectangle2i(newX, newY, group.getGridWidth() * SLOT_SIZE, group.getGridHeight() * SLOT_SIZE);
+            Rectangle2i groupRect = new Rectangle2i(newX, newY, group.getGridWidth() * SLOT_SIZE,
+                    group.getGridHeight() * SLOT_SIZE);
             if (newY < innerBounds.getY()) {
                 // 将 newY 对其到整数倍的 SLOT_SIZE (四舍五入)
                 newY = screenRect.getY() + Math.round((newY - screenRect.getY()) / (float) SLOT_SIZE) * SLOT_SIZE;
             } else if (newY + groupRect.getHeight() > innerBounds.getY1()) {
                 // 将 newY 对其到整数倍的 SLOT_SIZE (四舍五入)
-                newY = screenRect.getY1() - groupRect.getHeight() + Math.round((newY - screenRect.getY1() + groupRect.getHeight()) / (float) SLOT_SIZE) * SLOT_SIZE;
+                newY = screenRect.getY1() - groupRect.getHeight()
+                        + Math.round((newY - screenRect.getY1() + groupRect.getHeight()) / (float) SLOT_SIZE)
+                        * SLOT_SIZE;
             }
 
             if (newX < innerBounds.getX()) {
@@ -230,7 +236,9 @@ public class LayoutManager {
                 newX = screenRect.getX() + Math.round((newX - screenRect.getX()) / (float) SLOT_SIZE) * SLOT_SIZE;
             } else if (newX + groupRect.getWidth() > innerBounds.getX1()) {
                 // 将 newX 对其到整数倍的 SLOT_SIZE (四舍五入)
-                newX = screenRect.getX1() - groupRect.getWidth() + Math.round((newX - screenRect.getX1() + groupRect.getWidth()) / (float) SLOT_SIZE) * SLOT_SIZE;
+                newX = screenRect.getX1() - groupRect.getWidth()
+                        + Math.round((newX - screenRect.getX1() + groupRect.getWidth()) / (float) SLOT_SIZE)
+                        * SLOT_SIZE;
             }
             pos.setX(newX);
             pos.setY(newY);
@@ -241,12 +249,10 @@ public class LayoutManager {
 
     }
 
-
     public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y) {
         int newX = x;
         int newY = y;
         // collisions to center rect
-
 
         Rectangle2i screenRect = computeScreenRect(screen);
 
@@ -266,16 +272,19 @@ public class LayoutManager {
             collisionRects.add(actual);
         }
 
-
         Vector2i nearestOffset = null;
         Vector2i finalNewPos = null;
         for (CoinSlotGroup otherGroup : this.groups) {
             if (otherGroup == group) {
                 continue;
             }
+            if(!otherGroup.isVisible()) {
+                continue;
+            }
             boolean willAdsorb = false;
             for (Rectangle2i adRect : otherGroup.getAdsorptionRects()) {
-                Rectangle2i adRectActual = adRect.scaled(SLOT_SIZE).translateInPlace(new Vector2i(otherGroup.getGroupX(), otherGroup.getGroupY()));
+                Rectangle2i adRectActual = adRect.scaled(SLOT_SIZE)
+                        .translateInPlace(new Vector2i(otherGroup.getGroupX(), otherGroup.getGroupY()));
                 for (Rectangle2i currentCollision : collisionRects) {
                     if (adRectActual.intersects(currentCollision)) {
                         willAdsorb = true;
@@ -299,7 +308,8 @@ public class LayoutManager {
             }
 
             if (nearestOffset == null || offset.lengthManhattan() < nearestOffset.lengthManhattan()) {
-                Vector2i pos = otherOffset.add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
+                Vector2i pos = otherOffset
+                        .add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
 
                 boolean valid = true;
                 for (Rectangle2i rect : group.getCollisionRects()) {
@@ -324,19 +334,17 @@ public class LayoutManager {
             newY = finalNewPos.getY();
         }
 
-
         if (group.getGroupX() == newX && group.getGroupY() == newY) {
             return;
         }
 
         group.setGroupX(newX);
         group.setGroupY(newY);
-        computeGroupOverlap(true);
+        computeGroupOverlap(true, true);
 
     }
 
-
-    private void computeGroupOverlap(boolean borrow) {
+    private void computeGroupOverlap(boolean borrow, boolean rebuildIndex) {
         HashMap<Vector2i, ArrayList<CoinSlotGroup>> groupMap = new HashMap<>();
 
         for (CoinSlotGroup group : groups) {
@@ -357,6 +365,9 @@ public class LayoutManager {
                 // 借用模式，每个组内互相借用槽位
                 for (int i = 0; i < list.size(); i++) {
                     CoinSlotGroup groupA = list.get(i);
+                    if (groupA.isDiscard() || !groupA.isVisible()) {
+                        continue;
+                    }
                     groupA.clearBorrowedSlots();
                     groupA.beginUpdate();
                     boolean modified = false;
@@ -365,6 +376,9 @@ public class LayoutManager {
                             continue;
                         }
                         CoinSlotGroup groupB = list.get(j);
+                        if (groupB.isDiscard() || !groupB.isVisible()) {
+                            continue;
+                        }
                         if (groupA.borrowSlots(groupB, SLOT_SIZE)) {
                             modified = true;
                         }
@@ -389,11 +403,59 @@ public class LayoutManager {
             }
         }
 
-        if (changed) {
+        if (changed && rebuildIndex) {
             rebuildGroupIndex();
         }
     }
 
+    public void updateGroupVisibility() {
+        ClientCoinStorage storage = ClientCoinStorage.INSTANCE;
+        ArrayList<Tuple<CoinSlotGroup, CoinSlot>> toShow = new ArrayList<>();
+        ArrayList<Tuple<CoinSlotGroup, CoinSlot>> toHide = new ArrayList<>();
+        for (CoinSlotGroup group : groups) {
+            group.iterateSlots((slotX, slotY, slot, borrowed) -> {
+                if (borrowed) {
+                    return;
+                }
+                boolean visible = storage.getSlots().get(slot.getId()).isVisible();
+
+                if (visible == group.isVisible()) {
+                    return;
+                }
+                if (visible) {
+                    toShow.add(new Tuple<>(group, slot));
+                } else {
+                    toHide.add(new Tuple<>(group, slot));
+                }
+            });
+        }
+
+        for (Tuple<CoinSlotGroup, CoinSlot> tuple : toHide) {
+            CoinSlotGroup group = tuple.getA();
+            
+            if(group.isSingle()) {
+                group.setVisible(false);
+                continue;
+            }
+
+            CoinSlotGroup newGroup = new CoinSlotGroup();
+            newGroup.setVisible(false);
+            newGroup.setGroupX(group.getGroupX());
+            newGroup.setGroupY(group.getGroupY());
+            newGroup.takeSlot(tuple.getB().getId(), group);
+            groups.add(newGroup);
+            splitGroup(group);
+        }
+
+        for (Tuple<CoinSlotGroup, CoinSlot> tuple : toShow) {
+            CoinSlotGroup group = tuple.getA();
+            group.setVisible(true);
+            updateGroupPosition(screen, group, group.getGroupX(), group.getGroupY());
+        }
+
+        computeGroupOverlap(false, false);
+        rebuildGroupIndex();
+    }
 
     private void rebuildGroupIndex() {
         slotIdToGroupIndex.clear();
@@ -409,6 +471,10 @@ public class LayoutManager {
     }
 
     public CoinSlotGroup takeSlot(int slotId, CoinSlotGroup group) {
+        return this.takeSlot(slotId, group, true);
+    }
+
+    public CoinSlotGroup takeSlot(int slotId, CoinSlotGroup group, boolean rebuildIndex) {
         if (group.isSingle()) {
             return group;
         }
@@ -418,9 +484,11 @@ public class LayoutManager {
         newGroup.takeSlot(slotId, group);
         groups.add(newGroup);
         splitGroup(group);
-        rebuildGroupIndex();
 
-        computeGroupOverlap(true);
+        computeGroupOverlap(true, false);
+        if (rebuildIndex) {
+            rebuildGroupIndex();
+        }
         return newGroup;
     }
 
@@ -437,6 +505,7 @@ public class LayoutManager {
 
     public void init(AbstractContainerScreen<?> screen) {
         clear();
+        this.screen = screen;
 
         CoinSaveState saveState = CoinSaveState.instance();
         saveState.load();
@@ -466,7 +535,7 @@ public class LayoutManager {
 
                 int slotId = type.id();
                 if (used[slotId]) {
-                    logger.warn("Slot {} is already used", slotId);
+                    logger.warn("Slot {} is already used", (Object) slotId);
                     continue;
                 }
                 CoinSlot clientSlot = storage.getSlots().get(slotId);
@@ -479,6 +548,7 @@ public class LayoutManager {
                 minY = Math.min(minY, slot.y);
             }
             slotGroup.endUpdate();
+            slotGroup.setVisible(group.visible);
 
             if (slotGroup.empty() || slotGroup.isDiscard()) {
                 continue;
@@ -525,7 +595,6 @@ public class LayoutManager {
                 }
             }
 
-
             // make sure the group is inside the screen
 
             if (slotGroup.getGroupX() <= 0) {
@@ -542,7 +611,6 @@ public class LayoutManager {
             if (slotGroup.getGroupY() + slotGroup.getGridHeight() * SLOT_SIZE >= screen.height) {
                 slotGroup.setGroupY(screen.height - slotGroup.getGridHeight() * SLOT_SIZE);
             }
-
 
             groups.add(slotGroup);
         }
@@ -566,6 +634,8 @@ public class LayoutManager {
             groups.add(extra);
         }
         rebuildGroupIndex();
+
+        updateGroupVisibility();
     }
 
     public CoinSlotGroup getGroup(int slotId) {
@@ -580,6 +650,5 @@ public class LayoutManager {
     public List<CoinSlotGroup> getGroups() {
         return this.groups;
     }
-
 
 }

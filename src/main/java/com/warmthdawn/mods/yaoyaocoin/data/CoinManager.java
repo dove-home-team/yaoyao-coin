@@ -1,5 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.data;
 
+import com.google.common.collect.ImmutableList;
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
 import net.minecraft.advancements.critereon.ItemPredicate;
@@ -11,6 +12,7 @@ import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class CoinManager {
     private static final Logger logger = LogUtils.getLogger();
@@ -96,6 +98,10 @@ public class CoinManager {
 
     public int getCoinTypeCount() {
         return coinTypes.size();
+    }
+
+    public List<CoinType> getCoinTypes() {
+        return Collections.unmodifiableList(coinTypes);
     }
 
 

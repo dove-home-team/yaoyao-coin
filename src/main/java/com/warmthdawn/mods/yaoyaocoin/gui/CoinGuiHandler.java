@@ -4,6 +4,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.SlotKind;
+import com.warmthdawn.mods.yaoyaocoin.event.CoinRefreshedEvent;
 import com.warmthdawn.mods.yaoyaocoin.event.ScreenTooltipEvent;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
@@ -38,6 +39,7 @@ public class CoinGuiHandler {
         modEventBus.addListener(this::onMouseClick);
         modEventBus.addListener(this::onMouseRelease);
         modEventBus.addListener(this::onRenderTooltip);
+        modEventBus.addListener(this::onCoinUpdate);
 
     }
 
@@ -95,6 +97,13 @@ public class CoinGuiHandler {
         }
     }
 
+    private void onCoinUpdate(CoinRefreshedEvent event) {
+        if (!enabled) {
+            return;
+        }
+        layoutManager.updateGroupVisibility();
+    }
+
     private void resetDragging() {
         draggingGroup = null;
         draggingStartX = 0;
@@ -142,14 +151,18 @@ public class CoinGuiHandler {
                     int hoveringSlotId = findHoveringSlotConsideringBorder(hoveringGroup, (int) mouseX, (int) mouseY);
 
                     if (hoveringSlotId >= 0) {
+                        if (isLeftMouseDown) {
+                            draggingGroup = layoutManager.takeSlot(hoveringSlotId, hoveringGroup);
+                            hoveringGroup = draggingGroup;
 
-                        draggingGroup = layoutManager.takeSlot(hoveringSlotId, hoveringGroup);
-                        hoveringGroup = draggingGroup;
+                            draggingStartX = mouseX;
+                            draggingStartY = mouseY;
+                            prevDraggingX = draggingGroup.getGroupX();
+                            prevDraggingY = draggingGroup.getGroupY();
+                        } else if (event.getButton() == 1) {
+                            // TEMP: hide the slot by center click
+                        }
 
-                        draggingStartX = mouseX;
-                        draggingStartY = mouseY;
-                        prevDraggingX = draggingGroup.getGroupX();
-                        prevDraggingY = draggingGroup.getGroupY();
 
                     }
 
@@ -211,6 +224,9 @@ public class CoinGuiHandler {
 //        RenderSystem.setShaderTexture(0, GuiTextures.COIN_SLOT);
 
         for (CoinSlotGroup group : layoutManager.getGroups()) {
+            if (!group.isVisible()) {
+                continue;
+            }
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
             for (int i = -1; i <= group.getGridHeight(); i++) {
@@ -255,7 +271,9 @@ public class CoinGuiHandler {
         hoveringSlot = null;
         hoveringGroup = null;
         for (CoinSlotGroup group : layoutManager.getGroups()) {
-
+            if (!group.isVisible()) {
+                continue;
+            }
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
             group.iterateSlots((gridX, gridY, slot, isBorrowed) -> {
@@ -289,6 +307,9 @@ public class CoinGuiHandler {
         int[] finalCoinCounts = coinCounts;
 
         for (CoinSlotGroup group : layoutManager.getGroups()) {
+            if (!group.isVisible()) {
+                continue;
+            }
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
 

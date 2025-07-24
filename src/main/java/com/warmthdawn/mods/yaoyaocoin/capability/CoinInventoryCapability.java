@@ -46,6 +46,7 @@ public class CoinInventoryCapability {
     public static class CoinInventory implements IItemHandlerModifiable, INBTSerializable<Tag> {
         private final NonNullList<ItemStack> sampleStacks;
         private final int[] coinsCounts;
+        private final boolean[] coinVisibility;
         private final ArrayList<ItemStack> invalidStacks;
 
         public CoinInventory() {
@@ -54,11 +55,14 @@ public class CoinInventoryCapability {
 
             sampleStacks = NonNullList.withSize(manager.getCoinTypeCount(), ItemStack.EMPTY);
             coinsCounts = new int[manager.getCoinTypeCount()];
+            coinVisibility = new boolean[manager.getCoinTypeCount()];
+
 
             for (int i = 0; i < manager.getCoinTypeCount(); i++) {
                 CoinType type = manager.getCoinType(i);
                 sampleStacks.set(i, type.createItemStack());
                 coinsCounts[i] = 0;
+                coinVisibility[i] = true;
             }
 
 
@@ -68,12 +72,20 @@ public class CoinInventoryCapability {
         public int getCoinCount(int slot) {
             return coinsCounts[slot];
         }
+
+        public boolean getVisibility(int slot) {
+            return coinVisibility[slot];
+        }
         public ItemStack getSampleStack(int slot) {
             return sampleStacks.get(slot);
         }
 
         public void setCoinCount(int slot, int count) {
             coinsCounts[slot] = count;
+        }
+
+        public void setVisibility(int slot, boolean visibility) {
+            coinVisibility[slot] = visibility;
         }
 
         @Override
@@ -206,19 +218,6 @@ public class CoinInventoryCapability {
             return true;
         }
 
-        public Map<CoinType, Integer> getCoinMap() {
-            Map<CoinType, Integer> map = new HashMap<>();
-            for (int i = 0; i < coinsCounts.length; i++) {
-                int count = coinsCounts[i];
-                if (count == 0) {
-                    continue;
-                }
-                CoinType type = CoinManager.getInstance().getCoinType(i);
-                map.put(type, count);
-            }
-            return map;
-        }
-
         @Override
         public Tag serializeNBT() {
             CompoundTag nbt = new CompoundTag();
@@ -234,6 +233,7 @@ public class CoinInventoryCapability {
                 CompoundTag entry = new CompoundTag();
                 entry.put("item", sampleStack.serializeNBT());
                 entry.putInt("count", count);
+                entry.putBoolean("visibility", coinVisibility[i]);
 
                 String name = manager.getCoinType(i).name();
                 stacksTag.put(name, entry);
@@ -277,6 +277,7 @@ public class CoinInventoryCapability {
 
                 ItemStack sample = ItemStack.of(entry.getCompound("item"));
                 int count = entry.getInt("count");
+                boolean visibility = !entry.contains("visibility") || entry.getBoolean("visibility");
 
 
                 CoinType type = manager.findCoinType(key);
@@ -301,6 +302,7 @@ public class CoinInventoryCapability {
 
                 int slot = type.id();
                 coinsCounts[slot] = count;
+                coinVisibility[slot] = visibility;
             }
 
             ListTag invalidStacksTag = tag.getList("invalidStacks", 10);

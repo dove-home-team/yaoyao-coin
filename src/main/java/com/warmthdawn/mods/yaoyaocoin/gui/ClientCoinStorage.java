@@ -42,6 +42,15 @@ public class ClientCoinStorage {
         slots.get(type.id()).setCount(count);
     }
 
+    public void setSlotVisibility(String name, boolean visibility) {
+        CoinManager manager = CoinManager.getInstance();
+        CoinType type = manager.findCoinType(name);
+        if (type == null) {
+            return;
+        }
+        slots.get(type.id()).setVisible(visibility);
+    }
+
     public void resetSlotCount() {
         for (CoinSlot slot : slots) {
             slot.setCount(0);

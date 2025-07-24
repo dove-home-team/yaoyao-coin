@@ -566,7 +566,7 @@ public class CoinSlotGroup {
 
         for (int i = 0; i < groups.size(); i++) {
             CoinSlotGroup group = groups.get(i);
-            if (group.isDiscard()) {
+            if (group.isDiscard() || !group.isVisible()) {
                 continue;
             }
             minX = Math.min(minX, group.groupX);
@@ -591,6 +591,9 @@ public class CoinSlotGroup {
 //        for (CoinSlotGroup group : groups) {
         for (int i = 0; i < groups.size(); i++) {
             CoinSlotGroup group = groups.get(i);
+            if (group.isDiscard() || !group.isVisible()) {
+                continue;
+            }
             int xOff = (group.groupX - minX) / slotSize;
             int yOff = (group.groupY - minY) / slotSize;
 
@@ -738,6 +741,16 @@ public class CoinSlotGroup {
         return modified;
 
 
+    }
+
+    private boolean visible = true;
+
+    public boolean isVisible() {
+        return visible;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
     }
 
     public boolean splitUnConnected(List<CoinSlotGroup> splitted) {

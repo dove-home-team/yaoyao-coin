@@ -40,6 +40,7 @@ public class CoinSaveState {
         public int horizontal;
         public int vertical;
         public LayoutArea area;
+        public boolean visible = true;
     }
 
     public static class Slot {

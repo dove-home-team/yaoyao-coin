@@ -13,6 +13,7 @@ public class CoinSlot {
     private int slotId;
     private int count;
     private ItemStack stack;
+    private boolean visible;
 
     public CoinSlot(int slotId, ItemStack stack) {
         this.slotId = slotId;
@@ -35,6 +36,14 @@ public class CoinSlot {
 
     public void setCount(int count) {
         this.count = count;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
+
+    public boolean isVisible() {
+        return visible;
     }
 
 }

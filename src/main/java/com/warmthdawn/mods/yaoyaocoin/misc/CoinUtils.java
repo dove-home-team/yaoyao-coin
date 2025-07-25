@@ -8,7 +8,6 @@ import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.gui.ClientCoinStorage;
 import com.warmthdawn.mods.yaoyaocoin.gui.CoinSlot;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketCoinSlotClicked;
-import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoin;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,7 +19,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.ItemHandlerHelper;
-import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.Set;
@@ -106,6 +104,9 @@ public class CoinUtils {
 
         return inventory.map(inv -> {
             int slotId = type.id();
+            if (!inv.getVisibility(slotId)) {
+                return ItemStack.EMPTY;
+            }
             // find slot id
             ItemStack pickedStack = ItemStack.EMPTY;
             if (autoTransform) {
@@ -139,6 +140,9 @@ public class CoinUtils {
 
             // find slot id
             for (int slotId = 0; slotId < inv.getSlots(); slotId++) {
+                if (!inv.getVisibility(slotId)) {
+                    continue;
+                }
                 ItemStack sampleStack = inv.getSampleStack(slotId);
                 if (!ItemStack.isSameItemSameTags(stack, sampleStack)) {
                     continue;
@@ -274,6 +278,9 @@ public class CoinUtils {
         LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
         ItemStack finalStack = stack;
         inventory.ifPresent(it -> {
+            if (!it.getVisibility(slotId)) {
+                return;
+            }
             ItemStack slotStack = it.getStackInSlot(slotId);
 
             switch (clickType) {
@@ -369,6 +376,9 @@ public class CoinUtils {
             return stack;
         }
 
+        if (!storage.getSlots().get(type.id()).isVisible()) {
+            return stack;
+        }
 
         if (stack.isEmpty()) {
 

@@ -107,7 +107,7 @@ public class CoinEventHandler {
 
     @SubscribeEvent
     public static void playerDrop(LivingDropsEvent event) {
-        LivingEntity livingEntity = (LivingEntity) event.getEntity();
+        LivingEntity livingEntity = event.getEntity();
 
         if (!(livingEntity instanceof Player player)) {
             return;

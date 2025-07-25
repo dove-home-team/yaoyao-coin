@@ -183,11 +183,7 @@ public class CoinGuiHandler {
             return false;
         }
 
-        if (screen instanceof InventoryScreen && Minecraft.getInstance().player.isCreative()) {
-            return false;
-        }
-
-        return true;
+        return !(screen instanceof InventoryScreen) || !Minecraft.getInstance().player.isCreative();
     }
 
 

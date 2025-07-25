@@ -62,6 +62,9 @@ public class ClientCoinStorage {
         for (int i = 0; i < manager.getCoinTypeCount(); i++) {
             CoinType type = manager.getCoinType(i);
             if (type.matches(stack)) {
+                if (!slots.get(i).isVisible()) {
+                    continue;
+                }
                 int current = slots.get(i).getCount();
                 int limit = type.maxStackSize() - current;
                 if (limit <= 0) {
@@ -80,6 +83,9 @@ public class ClientCoinStorage {
     }
 
     private ItemStack extractFromSlotTransforming(int index, int count) {
+        if (!slots.get(index).isVisible()) {
+            return ItemStack.EMPTY;
+        }
         if (slots.get(index).getCount() >= count) {
             return extractFromSlot(index, count);
         }
@@ -109,6 +115,9 @@ public class ClientCoinStorage {
     }
 
     private ItemStack extractFromSlot(int index, int count) {
+        if (!slots.get(index).isVisible()) {
+            return ItemStack.EMPTY;
+        }
         ItemStack existing = slots.get(index).getStack();
         int current = slots.get(index).getCount();
         if (current == 0 || existing.isEmpty()) {

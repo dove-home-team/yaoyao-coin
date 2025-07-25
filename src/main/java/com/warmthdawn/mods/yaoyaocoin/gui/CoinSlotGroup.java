@@ -16,7 +16,6 @@ import java.util.*;
 public class CoinSlotGroup {
     private static final Logger logger = LogUtils.getLogger();
     private static final int SLOT_SIZE = 20;
-    private static final int SLOT_BORDER_SIZE = 4;
 
     public boolean isDiscard() {
         return discard;

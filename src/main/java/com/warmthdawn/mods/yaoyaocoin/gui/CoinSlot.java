@@ -10,9 +10,9 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 public class CoinSlot {
 
 
-    private int slotId;
+    private final int slotId;
     private int count;
-    private ItemStack stack;
+    private final ItemStack stack;
     private boolean visible;
 
     public CoinSlot(int slotId, ItemStack stack) {

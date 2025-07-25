@@ -15,7 +15,9 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 import net.minecraftforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class CoinInventoryCapability {
 
@@ -76,6 +78,7 @@ public class CoinInventoryCapability {
         public boolean getVisibility(int slot) {
             return coinVisibility[slot];
         }
+
         public ItemStack getSampleStack(int slot) {
             return sampleStacks.get(slot);
         }
@@ -139,6 +142,10 @@ public class CoinInventoryCapability {
             if (!ItemHandlerHelper.canItemStacksStack(stack, sample))
                 return stack;
 
+            if (!this.getVisibility(slot)) {
+                return stack;
+            }
+
             int existingCount = coinsCounts[slot];
             limit -= existingCount;
 
@@ -168,6 +175,14 @@ public class CoinInventoryCapability {
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
             if (amount == 0)
                 return ItemStack.EMPTY;
+
+            if(slot < 0 || slot >= sampleStacks.size()) {
+                return ItemStack.EMPTY;
+            }
+            
+            if (!this.getVisibility(slot)) {
+                return ItemStack.EMPTY;
+            }
 
             int existingCount = coinsCounts[slot];
             if (existingCount == 0)
@@ -293,7 +308,7 @@ public class CoinInventoryCapability {
                     continue;
                 }
 
-                if(count > type.maxStackSize()) {
+                if (count > type.maxStackSize()) {
                     YaoYaoCoin.LOGGER.warn("Coin count exceeds max stack size: {}", count);
                     int overflow = count - type.maxStackSize();
                     addToInvalidStacks(sample, overflow);

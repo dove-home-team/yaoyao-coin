@@ -17,12 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(net.minecraft.world.inventory.AbstractContainerMenu.class)
 public abstract class MixinAbstractContainerMenu {
-
-    @Shadow
-    @Final
-    public NonNullList<Slot> slots;
-
-
+    
     @Unique
     private final ThreadLocal<Boolean> flag_moveItemStackTo = ThreadLocal.withInitial(() -> false);
     @Unique

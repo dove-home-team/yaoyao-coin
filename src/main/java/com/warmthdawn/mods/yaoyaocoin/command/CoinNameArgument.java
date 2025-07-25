@@ -20,14 +20,14 @@ import java.util.concurrent.CompletableFuture;
 
 public class CoinNameArgument implements ArgumentType<String> {
     private static final Collection<String> EXAMPLES = Arrays.asList("copper", "gold");
-    private static final DynamicCommandExceptionType ERROR_COIN_NOT_FOUND = new DynamicCommandExceptionType((p_112095_) -> Component.translatable("yaoyaocoin.coin.notFound", new Object[]{p_112095_}));
+    private static final DynamicCommandExceptionType ERROR_COIN_NOT_FOUND = new DynamicCommandExceptionType((p_112095_) -> Component.translatable("yaoyaocoin.coin.notFound", p_112095_));
 
     public static CoinNameArgument coinName() {
         return new CoinNameArgument();
     }
 
     public static CoinType getCoin(CommandContext<CommandSourceStack> context, String name) throws CommandSyntaxException {
-        String s = (String) context.getArgument(name, String.class);
+        String s = context.getArgument(name, String.class);
         CoinType type = CoinManager.getInstance().findCoinType(s);
         if (type == null) {
             throw ERROR_COIN_NOT_FOUND.create(s);

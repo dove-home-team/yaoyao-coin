@@ -565,7 +565,7 @@ public class LayoutManager {
 
                 int slotId = type.id();
                 if (used[slotId]) {
-                    logger.warn("Slot {} is already used", (Object) slotId);
+                    logger.warn("Slot {} is already used", slotId);
                     continue;
                 }
                 CoinSlot clientSlot = storage.getSlots().get(slotId);

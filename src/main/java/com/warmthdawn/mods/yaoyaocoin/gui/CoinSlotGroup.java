@@ -194,12 +194,16 @@ public class CoinSlotGroup {
             slots.remove(entry);
         }
 
+        rebuildSlotIndex();
+        needsRebuild = false;
+        groupCollision = null;
+    }
+
+    private void rebuildSlotIndex() {
         slotIdToIndex.clear();
         for (int i = 0; i < slots.size(); i++) {
             slotIdToIndex.put(slots.get(i).slotId, i);
         }
-        needsRebuild = false;
-        groupCollision = null;
     }
 
     public Block createAdsorptionBlock(int gridSize, Vector2i offset) {
@@ -302,6 +306,7 @@ public class CoinSlotGroup {
             rebuildSlotGrid();
             computeCollisionRects();
         } else {
+            rebuildSlotIndex();
             needsRebuild = true;
         }
     }
@@ -697,11 +702,7 @@ public class CoinSlotGroup {
     }
 
     public boolean splitUnConnected(List<CoinSlotGroup> splitted) {
-
-
         UnionFind unionFind = new UnionFind(slots.size());
-
-
         final int windowSize = 2;
         for (int i = 0; i < gridHeight; i++) {
             for (int j = 0; j < gridWidth; j++) {

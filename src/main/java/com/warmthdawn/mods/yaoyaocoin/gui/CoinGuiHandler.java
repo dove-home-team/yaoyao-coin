@@ -243,31 +243,35 @@ public class CoinGuiHandler {
 
         GuiGraphics graphics = event.getGuiGraphics();
 
-        // draw collision rects
-        for (CoinSlotGroup group : layoutManager.getGroups()) {
-            if (!group.isVisible() || group == draggingGroup) {
-                continue;
+        if (Minecraft.getInstance().options.renderDebug) {
+
+            // draw collision rects
+            for (CoinSlotGroup group : layoutManager.getGroups()) {
+                if (!group.isVisible() || group == draggingGroup) {
+                    continue;
+                }
+                GroupCollision collision = group.getCollision();
+
+                // Red line border
+                for (Rectangle2i rect : collision.getCollisionRects()) {
+                    drawRect(graphics, rect, 0x44FF0000);
+                }
+
+                // draw overlap rect with green line
+                Rectangle2i rect = collision.getOverlapRect();
+                drawRect(graphics, rect, 0x4400FF00);
             }
-            GroupCollision collision = group.getCollision();
 
-//            // Red line border
-//            for (Rectangle2i rect : collision.getCollisionRects()) {
-//                drawRect(graphics, rect, 0x44FF0000);
-//            }
-
-            // draw overlap rect with green line
-            Rectangle2i rect = collision.getOverlapRect();
-            drawRect(graphics, rect, 0x4400FF00);
+            // draw current dragging rect
+            if (draggingGroup != null) {
+                GroupCollision collision = draggingGroup.getCollision().expand(SLOT_SIZE / 2);
+                drawRect(graphics, collision.getOverlapRect(), 0x440000FF);
+                for (Rectangle2i rect : collision.getCollisionRects()) {
+                    drawRect(graphics, rect, 0x4400FFFF);
+                }
+            }
         }
 
-        // draw current dragging rect
-        if (draggingGroup != null) {
-            GroupCollision collision = draggingGroup.getCollision().expand(SLOT_SIZE / 2);
-            drawRect(graphics, collision.getOverlapRect(), 0x440000FF);
-            for (Rectangle2i rect : collision.getCollisionRects()) {
-                drawRect(graphics, rect, 0x4400FFFF);
-            }
-        }
     }
 
     private static void drawRect(GuiGraphics graphics, Rectangle2i rect, int color) {

@@ -442,7 +442,7 @@ public class LayoutManager {
     public void updateGroupVisibility() {
         ClientCoinStorage storage = ClientCoinStorage.INSTANCE;
         ArrayList<Tuple<CoinSlotGroup, CoinSlot>> toShow = new ArrayList<>();
-        ArrayList<Tuple<CoinSlotGroup, CoinSlot>> toHide = new ArrayList<>();
+        HashMap<CoinSlotGroup, ArrayList<CoinSlot>> toHide = new HashMap<>();
         for (CoinSlotGroup group : groups) {
             group.iterateSlots((slotX, slotY, slot, borrowed) -> {
                 if (borrowed) {
@@ -456,25 +456,24 @@ public class LayoutManager {
                 if (visible) {
                     toShow.add(new Tuple<>(group, slot));
                 } else {
-                    toHide.add(new Tuple<>(group, slot));
+                    toHide.computeIfAbsent(group, k -> new ArrayList<>()).add(slot);
                 }
             });
         }
 
-        for (Tuple<CoinSlotGroup, CoinSlot> tuple : toHide) {
-            CoinSlotGroup group = tuple.getA();
-
+        for(CoinSlotGroup group: toHide.keySet()) {
             if (group.isSingle()) {
                 group.setVisible(false);
                 continue;
             }
-
-            CoinSlotGroup newGroup = new CoinSlotGroup();
-            newGroup.setVisible(false);
-            newGroup.setGroupX(group.getGroupX());
-            newGroup.setGroupY(group.getGroupY());
-            newGroup.takeSlot(tuple.getB().getId(), group);
-            groups.add(newGroup);
+            for(CoinSlot slot: toHide.get(group)) {
+                CoinSlotGroup newGroup = new CoinSlotGroup();
+                newGroup.setVisible(false);
+                newGroup.setGroupX(group.getGroupX());
+                newGroup.setGroupY(group.getGroupY());
+                newGroup.takeSlot(slot.getId(), group);
+                groups.add(newGroup);
+            }
             splitGroup(group);
         }
 

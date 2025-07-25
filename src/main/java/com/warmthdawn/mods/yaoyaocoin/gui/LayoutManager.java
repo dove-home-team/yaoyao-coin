@@ -24,6 +24,7 @@ public class LayoutManager {
     private final Int2IntOpenHashMap slotIdToGroupIndex = new Int2IntOpenHashMap();
 
     private static final int SLOT_SIZE = 20;
+    private static final int SLOT_BORDER_SIZE = 4;
 
     private final Logger logger = LogUtils.getLogger();
     private AbstractContainerScreen<?> screen;
@@ -226,7 +227,7 @@ public class LayoutManager {
                 // 将 newY 对其到整数倍的 SLOT_SIZE (四舍五入)
                 newY = screenRect.getY1() - groupRect.getHeight()
                         + Math.round((newY - screenRect.getY1() + groupRect.getHeight()) / (float) SLOT_SIZE)
-                        * SLOT_SIZE;
+                                * SLOT_SIZE;
             }
 
             if (newX < innerBounds.getX()) {
@@ -236,7 +237,7 @@ public class LayoutManager {
                 // 将 newX 对其到整数倍的 SLOT_SIZE (四舍五入)
                 newX = screenRect.getX1() - groupRect.getWidth()
                         + Math.round((newX - screenRect.getX1() + groupRect.getWidth()) / (float) SLOT_SIZE)
-                        * SLOT_SIZE;
+                                * SLOT_SIZE;
             }
             pos.setX(newX);
             pos.setY(newY);
@@ -248,7 +249,7 @@ public class LayoutManager {
     }
 
     public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y,
-                                    boolean forceAdsorb) {
+            boolean forceAdsorb) {
         int newX = x;
         int newY = y;
         // collisions to center rect
@@ -303,7 +304,8 @@ public class LayoutManager {
             Block otherBlock = otherGroup.createAdsorptionBlock(SLOT_SIZE, Vector2i.ZERO);
             Block currentBlock = group.createAdsorptionBlock(SLOT_SIZE, newPos.subtract(otherOffset));
 
-            Vector2i blockOffset = otherOffset.add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
+            Vector2i blockOffset = otherOffset
+                    .add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
             offsetCollision.translateInPlace(blockOffset);
             final int currentGroupId = i;
             Vector2i offset = Block.moveBlocks(currentBlock, otherBlock, (pos) -> {
@@ -314,15 +316,29 @@ public class LayoutManager {
                 if (screenCollision.intersects(offsetCollision)) {
                     valid = false;
                 } else {
+
                     for (int j = 0; j < collisions.length; j++) {
                         GroupCollision collision = collisions[j];
                         if (collision == null || j == currentGroupId) {
                             continue;
                         }
-                        if (collision.intersects(offsetCollision)) {
-                            valid = false;
-                            break;
+
+                        CoinSlotGroup collideGroup = groups.get(j);
+                        if ((collideGroup.getGroupX() - otherGroup.getGroupX()) % SLOT_SIZE == 0
+                                && (collideGroup.getGroupY() - otherGroup.getGroupY()) % SLOT_SIZE == 0) {
+                            // same grid, may merge so ignore borders
+                            if (collision.intersects(offsetCollision)) {
+                                valid = false;
+                                break;
+                            }
+                        } else {
+
+                            if (collision.intersects(offsetCollision, 2 * SLOT_BORDER_SIZE)) {
+                                valid = false;
+                                break;
+                            }
                         }
+
                     }
                 }
                 offsetCollision.translateInPlace(offsetPos.invertInPlace());

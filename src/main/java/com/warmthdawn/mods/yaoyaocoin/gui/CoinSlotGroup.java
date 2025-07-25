@@ -85,7 +85,7 @@ public class CoinSlotGroup {
 
     public GroupCollision getCollision() {
         if (groupCollision == null) {
-            groupCollision = GroupCollision.compute(this, SLOT_SIZE).expand(SLOT_BORDER_SIZE);
+            groupCollision = GroupCollision.compute(this, SLOT_SIZE);
         }
         return groupCollision;
     }

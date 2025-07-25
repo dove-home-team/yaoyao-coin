@@ -109,6 +109,13 @@ public class GroupCollision {
     return false;
   }
 
+  public boolean intersects(GroupCollision collision, int borderSize) {
+    this.expandInPlace(borderSize);
+    boolean intersects = this.intersects(collision);
+    this.expandInPlace(-borderSize);
+    return intersects;
+  }
+
   public boolean intersects(GroupCollision collision) {
     if (this.isSingle) {
       return collision.intersects(collisionRects.get(0));

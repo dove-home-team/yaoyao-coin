@@ -17,7 +17,7 @@ public class GroupCollision {
   }
 
   public static GroupCollision createSingle(Rectangle2i rect) {
-    return new GroupCollision(rect, List.of(rect));
+    return new GroupCollision(rect, List.of(rect.translated(Vector2i.ZERO)));
   }
 
   public static GroupCollision compute(CoinSlotGroup group, int slotSize) {

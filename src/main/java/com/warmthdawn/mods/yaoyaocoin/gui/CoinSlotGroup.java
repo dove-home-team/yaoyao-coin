@@ -209,8 +209,7 @@ public class CoinSlotGroup {
                 matrix[j][i] = hasSlot(j, i);
             }
         }
-        Vector2i pos = offset.gridIndex(gridSize);
-        return new Block(matrix, pos.getX(), pos.getY());
+        return new Block(matrix, (int) Math.floor(1.0 * offset.getX() / gridSize), (int) Math.floor(1.0 * offset.getY() / gridSize));
     }
 
     public Vector2i getOffset() {

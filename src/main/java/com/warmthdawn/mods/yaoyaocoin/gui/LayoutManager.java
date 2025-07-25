@@ -262,9 +262,9 @@ public class LayoutManager {
         }
 
         Vector2i newPos = new Vector2i(newX, newY);
-        GroupCollision currentCollision = GroupCollision.compute(group, SLOT_SIZE, newPos);
-        GroupCollision screenCollision = GroupCollision.createSingle(screenRect).expandInPlace(-4);
-        GroupCollision offsetCollision = currentCollision.expand(4);
+        GroupCollision offsetCollision = GroupCollision.compute(group, SLOT_SIZE, Vector2i.ZERO);
+        GroupCollision currentCollision = offsetCollision.translated(newPos);
+        GroupCollision screenCollision = GroupCollision.createSingle(screenRect);
 
         GroupCollision[] collisions = new GroupCollision[groups.size()];
 
@@ -299,12 +299,11 @@ public class LayoutManager {
                 }
             }
             Vector2i otherOffset = otherGroup.getOffset();
-            Vector2i offDiff = newPos.subtract(otherOffset);
 
             Block otherBlock = otherGroup.createAdsorptionBlock(SLOT_SIZE, Vector2i.ZERO);
-            Block currentBlock = group.createAdsorptionBlock(SLOT_SIZE, offDiff);
+            Block currentBlock = group.createAdsorptionBlock(SLOT_SIZE, newPos.subtract(otherOffset));
 
-            Vector2i blockOffset = offDiff.gridAdsorption(SLOT_SIZE).subtract(offDiff);
+            Vector2i blockOffset = otherOffset.add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
             offsetCollision.translateInPlace(blockOffset);
             final int currentGroupId = i;
             Vector2i offset = Block.moveBlocks(currentBlock, otherBlock, (pos) -> {
@@ -339,20 +338,8 @@ public class LayoutManager {
                 Vector2i pos = otherOffset
                         .add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
 
-//                boolean valid = true;
-//                for (Rectangle2i rect : group.getCollisionRects()) {
-//                    Rectangle2i actual = rect.scaled(SLOT_SIZE).translateInPlace(pos);
-//
-//                    if (!screenRect.intersects(actual)) {
-//                        continue;
-//                    }
-//                    valid = false;
-//
-//                }
-//                if (valid) {
-                    nearestOffset = offset;
-                    finalNewPos = pos;
-//                }
+                nearestOffset = offset;
+                finalNewPos = pos;
 
             }
         }

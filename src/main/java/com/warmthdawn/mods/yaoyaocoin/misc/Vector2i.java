@@ -82,13 +82,4 @@ public class Vector2i {
     public Vector2i scaled(int scale) {
         return new Vector2i(x * scale, y * scale);
     }
-
-    public Vector2i gridIndex(int gridSize) {
-        return new Vector2i((int) Math.floor(1.0 * x / gridSize), (int) Math.floor(1.0 * y / gridSize));
-    }
-
-    // 吸附到网格
-    public Vector2i gridAdsorption(int gridSize) {
-        return gridIndex(gridSize).scaled(gridSize);
-    }
 }

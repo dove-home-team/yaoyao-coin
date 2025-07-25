@@ -74,7 +74,7 @@ public class Block {
             block1.posX += offset.getX();
             block1.posY += offset.getY();
 
-            if (!block1.intersects(block2) && block1.canAdsorb(block2) && predicate.test(new Vector2i(block1.posX, block1.posY))) {
+            if (!block1.intersects(block2) && block1.canAdsorb(block2) && predicate.test(new Vector2i(offset.getX(), offset.getY()))) {
                 return offset;
             }
 

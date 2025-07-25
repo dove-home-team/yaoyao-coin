@@ -7,6 +7,7 @@ import com.warmthdawn.mods.yaoyaocoin.data.SlotKind;
 import com.warmthdawn.mods.yaoyaocoin.event.CoinRefreshedEvent;
 import com.warmthdawn.mods.yaoyaocoin.event.ScreenTooltipEvent;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
+import com.warmthdawn.mods.yaoyaocoin.misc.GroupCollision;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.mixin.AbstractContainerScreenAccessor;
 import net.minecraft.client.Minecraft;
@@ -227,6 +228,9 @@ public class CoinGuiHandler {
             if (!group.isVisible()) {
                 continue;
             }
+            if (group.isDiscard()) {
+                continue;
+            }
             int x0 = group.getGroupX();
             int y0 = group.getGroupY();
             for (int i = -1; i <= group.getGridHeight(); i++) {
@@ -235,6 +239,43 @@ public class CoinGuiHandler {
                 }
             }
         }
+
+
+        GuiGraphics graphics = event.getGuiGraphics();
+
+        // draw collision rects
+        for (CoinSlotGroup group : layoutManager.getGroups()) {
+            if (!group.isVisible() || group == draggingGroup) {
+                continue;
+            }
+            GroupCollision collision = group.getCollision();
+
+//            // Red line border
+//            for (Rectangle2i rect : collision.getCollisionRects()) {
+//                drawRect(graphics, rect, 0x44FF0000);
+//            }
+
+            // draw overlap rect with green line
+            Rectangle2i rect = collision.getOverlapRect();
+            drawRect(graphics, rect, 0x4400FF00);
+        }
+
+        // draw current dragging rect
+        if (draggingGroup != null) {
+            GroupCollision collision = draggingGroup.getCollision().expand(SLOT_SIZE / 2);
+            drawRect(graphics, collision.getOverlapRect(), 0x440000FF);
+            for (Rectangle2i rect : collision.getCollisionRects()) {
+                drawRect(graphics, rect, 0x4400FFFF);
+            }
+        }
+    }
+
+    private static void drawRect(GuiGraphics graphics, Rectangle2i rect, int color) {
+
+        graphics.hLine(rect.getX(), rect.getX1() - 1, rect.getY(), color);
+        graphics.hLine(rect.getX(), rect.getX1() - 1, rect.getY1() - 1, color);
+        graphics.vLine(rect.getX(), rect.getY(), rect.getY1() - 1, color);
+        graphics.vLine(rect.getX1() - 1, rect.getY(), rect.getY1() - 1, color);
     }
 
     private void handleDragging(AbstractContainerScreen<?> screen, double mouseX, double mouseY) {
@@ -248,7 +289,9 @@ public class CoinGuiHandler {
         int x0 = prevDraggingX;
         int y0 = prevDraggingY;
 
-        layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy));
+        boolean isShiftHolding = Screen.hasShiftDown();
+
+        layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy), isShiftHolding);
     }
 
     public void onDrawForeground(ContainerScreenEvent.Render.Foreground event) {

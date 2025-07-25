@@ -59,13 +59,36 @@ public class Vector2i {
         return new Vector2i(x - newPos.x, y - newPos.y);
     }
 
-    public Vector2i scaleInPlace(int slotSize) {
-        x *= slotSize;
-        y *= slotSize;
+    public Vector2i scaleInPlace(int scale) {
+        x *= scale;
+        y *= scale;
         return this;
+    }
+
+    public Vector2i invertInPlace() {
+        x = -x;
+        y = -y;
+        return this;
+    }
+
+    public Vector2i inverted() {
+        return new Vector2i(-x, -y);
     }
 
     public Vector2i divide(int i) {
         return new Vector2i(x / i, y / i);
+    }
+
+    public Vector2i scaled(int scale) {
+        return new Vector2i(x * scale, y * scale);
+    }
+
+    public Vector2i gridIndex(int gridSize) {
+        return new Vector2i((int) Math.floor(1.0 * x / gridSize), (int) Math.floor(1.0 * y / gridSize));
+    }
+
+    // 吸附到网格
+    public Vector2i gridAdsorption(int gridSize) {
+        return gridIndex(gridSize).scaled(gridSize);
     }
 }

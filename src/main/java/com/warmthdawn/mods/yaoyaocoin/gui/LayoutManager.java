@@ -5,14 +5,13 @@ import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
+import com.warmthdawn.mods.yaoyaocoin.misc.GroupCollision;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import net.minecraft.util.Tuple;
-
-import org.checkerframework.checker.units.qual.g;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -23,7 +22,6 @@ public class LayoutManager {
 
     private final ArrayList<CoinSlotGroup> groups = new ArrayList<>();
     private final Int2IntOpenHashMap slotIdToGroupIndex = new Int2IntOpenHashMap();
-
 
     private static final int SLOT_SIZE = 20;
 
@@ -249,59 +247,89 @@ public class LayoutManager {
 
     }
 
-    public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y) {
+    public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y,
+                                    boolean forceAdsorb) {
         int newX = x;
         int newY = y;
         // collisions to center rect
 
         Rectangle2i screenRect = computeScreenRect(screen);
 
-        Vector2i screenCollision = new Vector2i(newX, newY);
-        if (collisionWithScreen(screenRect, group, screenCollision, 8)) {
-            newX = screenCollision.getX();
-            newY = screenCollision.getY();
+        Vector2i screenSticky = new Vector2i(newX, newY);
+        if (collisionWithScreen(screenRect, group, screenSticky, 8)) {
+            newX = screenSticky.getX();
+            newY = screenSticky.getY();
         }
 
-        // 查找最近的吸附组
-
-        List<Rectangle2i> collisionRects = new ArrayList<>(group.getCollisionRects().size());
-
         Vector2i newPos = new Vector2i(newX, newY);
-        for (Rectangle2i rect : group.getCollisionRects()) {
-            Rectangle2i actual = rect.scaled(SLOT_SIZE).translateInPlace(newPos);
-            collisionRects.add(actual);
+        GroupCollision currentCollision = GroupCollision.compute(group, SLOT_SIZE, newPos);
+        GroupCollision screenCollision = GroupCollision.createSingle(screenRect).expandInPlace(-4);
+        GroupCollision offsetCollision = currentCollision.expand(4);
+
+        GroupCollision[] collisions = new GroupCollision[groups.size()];
+
+        for (int i = 0; i < groups.size(); i++) {
+            CoinSlotGroup otherGroup = groups.get(i);
+            if (otherGroup == group) {
+                continue;
+            }
+            if (!otherGroup.isVisible()) {
+                continue;
+            }
+            collisions[i] = otherGroup.getCollision();
         }
 
         Vector2i nearestOffset = null;
         Vector2i finalNewPos = null;
-        for (CoinSlotGroup otherGroup : this.groups) {
+
+        for (int i = 0; i < groups.size(); i++) {
+            CoinSlotGroup otherGroup = groups.get(i);
             if (otherGroup == group) {
                 continue;
             }
-            if(!otherGroup.isVisible()) {
+            if (!otherGroup.isVisible()) {
                 continue;
             }
-            boolean willAdsorb = false;
-            for (Rectangle2i adRect : otherGroup.getAdsorptionRects()) {
-                Rectangle2i adRectActual = adRect.scaled(SLOT_SIZE)
-                        .translateInPlace(new Vector2i(otherGroup.getGroupX(), otherGroup.getGroupY()));
-                for (Rectangle2i currentCollision : collisionRects) {
-                    if (adRectActual.intersects(currentCollision)) {
-                        willAdsorb = true;
-                        break;
-                    }
+
+            if (!forceAdsorb) {
+
+                GroupCollision adsorptionCollision = otherGroup.getCollision().expand(SLOT_SIZE / 2);
+                if (!currentCollision.intersects(adsorptionCollision)) {
+                    continue;
                 }
             }
-
-            if (!willAdsorb) {
-                continue;
-            }
             Vector2i otherOffset = otherGroup.getOffset();
+            Vector2i offDiff = newPos.subtract(otherOffset);
 
             Block otherBlock = otherGroup.createAdsorptionBlock(SLOT_SIZE, Vector2i.ZERO);
-            Block currentBlock = group.createAdsorptionBlock(SLOT_SIZE, newPos.subtract(otherOffset));
+            Block currentBlock = group.createAdsorptionBlock(SLOT_SIZE, offDiff);
 
-            Vector2i offset = Block.moveBlocks(currentBlock, otherBlock);
+            Vector2i blockOffset = offDiff.gridAdsorption(SLOT_SIZE).subtract(offDiff);
+            offsetCollision.translateInPlace(blockOffset);
+            final int currentGroupId = i;
+            Vector2i offset = Block.moveBlocks(currentBlock, otherBlock, (pos) -> {
+                Vector2i offsetPos = pos.scaled(SLOT_SIZE);
+                offsetCollision.translateInPlace(offsetPos);
+                boolean valid = true;
+
+                if (screenCollision.intersects(offsetCollision)) {
+                    valid = false;
+                } else {
+                    for (int j = 0; j < collisions.length; j++) {
+                        GroupCollision collision = collisions[j];
+                        if (collision == null || j == currentGroupId) {
+                            continue;
+                        }
+                        if (collision.intersects(offsetCollision)) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+                offsetCollision.translateInPlace(offsetPos.invertInPlace());
+                return valid;
+            });
+            offsetCollision.translateInPlace(blockOffset.invertInPlace());
 
             if (offset == null) {
                 continue;
@@ -311,20 +339,20 @@ public class LayoutManager {
                 Vector2i pos = otherOffset
                         .add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
 
-                boolean valid = true;
-                for (Rectangle2i rect : group.getCollisionRects()) {
-                    Rectangle2i actual = rect.scaled(SLOT_SIZE).translateInPlace(pos);
-
-                    if (!screenRect.intersects(actual)) {
-                        continue;
-                    }
-                    valid = false;
-
-                }
-                if (valid) {
+//                boolean valid = true;
+//                for (Rectangle2i rect : group.getCollisionRects()) {
+//                    Rectangle2i actual = rect.scaled(SLOT_SIZE).translateInPlace(pos);
+//
+//                    if (!screenRect.intersects(actual)) {
+//                        continue;
+//                    }
+//                    valid = false;
+//
+//                }
+//                if (valid) {
                     nearestOffset = offset;
                     finalNewPos = pos;
-                }
+//                }
 
             }
         }
@@ -432,8 +460,8 @@ public class LayoutManager {
 
         for (Tuple<CoinSlotGroup, CoinSlot> tuple : toHide) {
             CoinSlotGroup group = tuple.getA();
-            
-            if(group.isSingle()) {
+
+            if (group.isSingle()) {
                 group.setVisible(false);
                 continue;
             }
@@ -450,7 +478,7 @@ public class LayoutManager {
         for (Tuple<CoinSlotGroup, CoinSlot> tuple : toShow) {
             CoinSlotGroup group = tuple.getA();
             group.setVisible(true);
-            updateGroupPosition(screen, group, group.getGroupX(), group.getGroupY());
+            updateGroupPosition(screen, group, group.getGroupX(), group.getGroupY(), false);
         }
 
         computeGroupOverlap(false, false);

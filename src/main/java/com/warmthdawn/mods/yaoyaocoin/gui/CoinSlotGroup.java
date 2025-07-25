@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.SlotKind;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
+import com.warmthdawn.mods.yaoyaocoin.misc.GroupCollision;
 import com.warmthdawn.mods.yaoyaocoin.misc.Rectangle2i;
 import com.warmthdawn.mods.yaoyaocoin.misc.UnionFind;
 import com.warmthdawn.mods.yaoyaocoin.misc.Vector2i;
@@ -14,6 +15,8 @@ import java.util.*;
 
 public class CoinSlotGroup {
     private static final Logger logger = LogUtils.getLogger();
+    private static final int SLOT_SIZE = 20;
+    private static final int SLOT_BORDER_SIZE = 4;
 
     public boolean isDiscard() {
         return discard;
@@ -23,7 +26,7 @@ public class CoinSlotGroup {
         return slots.isEmpty();
     }
 
-    public int slotSize() {
+    public int slotCount() {
         return slots.size();
     }
 
@@ -72,7 +75,7 @@ public class CoinSlotGroup {
     private int groupX = 0;
     private int groupY = 0;
     private final List<Rectangle2i> collisionRects = new ArrayList<>();
-    private final List<Rectangle2i> adsorptionRects = new ArrayList<>();
+    private GroupCollision groupCollision = null;
     private boolean updating = false;
     private boolean discard = false;
 
@@ -80,8 +83,11 @@ public class CoinSlotGroup {
         return collisionRects;
     }
 
-    public List<Rectangle2i> getAdsorptionRects() {
-        return adsorptionRects;
+    public GroupCollision getCollision() {
+        if (groupCollision == null) {
+            groupCollision = GroupCollision.compute(this, SLOT_SIZE).expand(SLOT_BORDER_SIZE);
+        }
+        return groupCollision;
     }
 
     private boolean needsRebuild = false;
@@ -128,7 +134,7 @@ public class CoinSlotGroup {
 
 
     private void rebuildSlotGrid() {
-        if (slots.isEmpty()) {
+        if (slots.isEmpty() || slots.stream().allMatch(Entry::isBorrowed)) {
             this.discardGroup();
             return;
         }
@@ -193,6 +199,7 @@ public class CoinSlotGroup {
             slotIdToIndex.put(slots.get(i).slotId, i);
         }
         needsRebuild = false;
+        groupCollision = null;
     }
 
     public Block createAdsorptionBlock(int gridSize, Vector2i offset) {
@@ -202,7 +209,8 @@ public class CoinSlotGroup {
                 matrix[j][i] = hasSlot(j, i);
             }
         }
-        return new Block(matrix, (int) Math.floor(1.0 * offset.getX() / gridSize), (int) Math.floor(1.0 * offset.getY() / gridSize));
+        Vector2i pos = offset.gridIndex(gridSize);
+        return new Block(matrix, pos.getX(), pos.getY());
     }
 
     public Vector2i getOffset() {
@@ -210,108 +218,51 @@ public class CoinSlotGroup {
     }
 
 
-    private static final boolean[] TRUE_AND_FALSE = new boolean[]{true, false};
-
-    private void computeCollisionRects() {
-        collisionRects.clear();
+    public void computeCollisionRects() {
         if (isDiscard()) {
             return;
         }
         collisionRects.clear();
-        boolean[][] visitedColl = new boolean[gridHeight][gridWidth];
+        // R === gridHeight === Y
+        // C === gridWidth === X
+        boolean[][] used = new boolean[gridHeight][gridWidth];
 
-        for (int i = 0; i < gridHeight; i++) {
-            for (int j = 0; j < gridWidth; j++) {
-                if (visitedColl[i][j]) {
+        for (int y = 0; y < gridHeight; ++y) {
+            for (int x = 0; x < gridWidth; ) {
+                if (!hasSlot(x, y) || used[y][x]) {
+                    x++;
                     continue;
                 }
-                Entry entry = getSlotAt(j, i);
-                if (entry == null || entry.isBorrowed) {
-                    continue;
-                }
-                int minX = j;
-                int minY = i;
-                int maxX = j;
-                int maxY = i;
-                visitedColl[i][j] = true;
 
+                // 找出当前行从 c 开始的连续 true
+                int x1 = x;
+                while (x1 < gridWidth && hasSlot(x1, y)) x1++;
 
-                for (boolean horizontal : TRUE_AND_FALSE) {
-                    int iterCount = horizontal ? gridWidth : gridHeight;
-                    int iterStart = horizontal ? j : i;
-                    boolean flag = false;
-                    for (int k = iterStart; k < iterCount; k++) {
-                        int x = horizontal ? k : j;
-                        int y = horizontal ? i : k;
-                        Entry other = getSlotAt(x, y);
-                        if (other == null || other.isBorrowed || other.slotId == entry.slotId) {
-                            break;
+                // 向下扩展最大高度
+                int maxHeight = 1;
+                outer:
+                for (int h = 1; y + h < gridHeight; ++h) {
+                    for (int cc = x; cc < x1; ++cc) {
+                        if (!hasSlot(cc, y + h)) {
+                            break outer;
                         }
-                        if (visitedColl[y][x]) {
-                            break;
-                        }
-                        minX = Math.min(minX, x);
-                        minY = Math.min(minY, y);
-                        maxX = Math.max(maxX, x);
-                        maxY = Math.max(maxY, y);
-                        visitedColl[y][x] = true;
-                        flag = true;
-
                     }
-
-                    if (flag) {
-                        break;
-                    }
+                    maxHeight++;
                 }
-                collisionRects.add(new Rectangle2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
 
+                // 添加矩形并标记
+                Rectangle2i rect = new Rectangle2i(x, y, x1 - x, maxHeight);
+                collisionRects.add(rect);
+                for (int rr = y; rr < y + maxHeight; ++rr)
+                    for (int cc = x; cc < x1; ++cc)
+                        used[rr][cc] = true;
+
+                x = x1;
             }
         }
 
-        boolean[][] visitedAds = new boolean[gridHeight + 2][gridWidth + 2];
-        for (int i = -1; i <= gridHeight; i++) {
-            for (int j = -1; j <= gridWidth; j++) {
-                if (visitedAds[i + 1][j + 1]) {
-                    continue;
-                }
-                boolean isAdsorption = isAdsorptionSlot(j, i);
-                if (!isAdsorption) {
-                    continue;
-                }
+        groupCollision = null;
 
-                int minX = j;
-                int minY = i;
-                int maxX = j;
-                int maxY = i;
-                visitedAds[i + 1][j + 1] = true;
-
-                for (boolean horizontal : TRUE_AND_FALSE) {
-                    int iterCount = horizontal ? gridWidth : gridHeight;
-                    int iterStart = horizontal ? j : i;
-                    boolean flag = false;
-                    for (int k = iterStart + 1; k <= iterCount; k++) {
-
-                        int x = horizontal ? k : j;
-                        int y = horizontal ? i : k;
-
-                        if (visitedAds[y + 1][x + 1]) {
-                            break;
-                        }
-
-                        boolean isAdsorptionOther = isAdsorptionSlot(x, y);
-                        if (!isAdsorptionOther) {
-                            continue;
-                        }
-                        minX = Math.min(minX, x);
-                        minY = Math.min(minY, y);
-                        maxX = Math.max(maxX, x);
-                        maxY = Math.max(maxY, y);
-                        visitedAds[y + 1][x + 1] = true;
-                    }
-                }
-                adsorptionRects.add(new Rectangle2i(minX, minY, maxX - minX + 1, maxY - minY + 1));
-            }
-        }
     }
 
     public void addSlot(int gridX, int gridY, CoinSlot slot, boolean borrowed) {
@@ -392,15 +343,7 @@ public class CoinSlotGroup {
                 continue;
             }
 
-            boolean adsorb = false;
-            for (Rectangle2i rect : adsorptionRects) {
-                if (rect.contains(new Vector2i(slotX, slotY))) {
-                    adsorb = true;
-                    break;
-                }
-            }
-
-            if (!adsorb) {
+            if (!isAdsorptionSlot(slotX, slotY)) {
                 continue;
             }
 
@@ -503,10 +446,12 @@ public class CoinSlotGroup {
 
     public void setGroupX(int groupX) {
         this.groupX = groupX;
+        this.groupCollision = null;
     }
 
     public void setGroupY(int groupY) {
         this.groupY = groupY;
+        this.groupCollision = null;
     }
 
     public int getGridWidth() {
@@ -586,7 +531,7 @@ public class CoinSlotGroup {
         int xEnd = Integer.MIN_VALUE;
         int yEnd = Integer.MIN_VALUE;
 
-        IntList invalidSlots = new IntArrayList();
+        Int2ObjectOpenHashMap<IntList> invalidSlots = new Int2ObjectOpenHashMap<>();
 
 //        for (CoinSlotGroup group : groups) {
         for (int i = 0; i < groups.size(); i++) {
@@ -619,7 +564,7 @@ public class CoinSlotGroup {
                         continue;
                     }
 
-                    invalidSlots.add(entry.slotId);
+                    invalidSlots.computeIfAbsent(slotGroupMap[entry.slotId], it -> new IntArrayList()).add(entry.slotId);
 
 
                 } else {
@@ -628,24 +573,24 @@ public class CoinSlotGroup {
             }
         }
 
+        boolean modified = false;
         if (!invalidSlots.isEmpty()) {
-
+            modified = true;
             CoinSlotGroup invalidGroup = new CoinSlotGroup();
             invalidGroup.setGroupX(minX - slotSize - 10);
             invalidGroup.setGroupY(minY);
 
             invalidGroup.beginUpdate();
 
-            for (int i = 0; i < invalidSlots.size(); i++) {
-                int slotId = invalidSlots.getInt(i);
-                int groupId = slotGroupMap[slotId];
+            for (Int2ObjectMap.Entry<IntList> entry : invalidSlots.int2ObjectEntrySet()) {
+                int groupId = entry.getIntKey();
                 CoinSlotGroup group = groups.get(groupId);
-                invalidGroup.takeSlot(slotId, group);
-            }
-
-            for (int i = 0; i < invalidSlots.size(); i++) {
-                Entry entry = invalidGroup.slots.get(i);
-                invalidGroup.slots.set(i, new Entry(0, i, entry.slotId, false));
+                group.beginUpdate();
+                for (int i = 0; i < entry.getValue().size(); i++) {
+                    int slotId = entry.getValue().getInt(i);
+                    invalidGroup.takeSlot(slotId, group);
+                }
+                group.endUpdate();
             }
             invalidGroup.endUpdate();
             additional.add(invalidGroup);
@@ -691,7 +636,6 @@ public class CoinSlotGroup {
             groupMap.computeIfAbsent(g, it -> new ArrayList<>()).add(groups.get(i));
         }
 
-        boolean modified = false;
 
         for (Int2ObjectMap.Entry<List<CoinSlotGroup>> entry : groupMap.int2ObjectEntrySet()) {
             List<CoinSlotGroup> list = entry.getValue();

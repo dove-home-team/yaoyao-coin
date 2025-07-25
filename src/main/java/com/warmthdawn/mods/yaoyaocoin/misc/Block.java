@@ -2,7 +2,9 @@ package com.warmthdawn.mods.yaoyaocoin.misc;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 public class Block {
     boolean[][] matrix;
@@ -60,7 +62,7 @@ public class Block {
         new Vector2i(0, -1)
     };
 
-    public static Vector2i moveBlocks(Block block1, Block block2) {
+    public static Vector2i moveBlocks(Block block1, Block block2, Predicate<Vector2i> predicate) {
         ArrayDeque<Vector2i> queue = new ArrayDeque<>();
         Set<Vector2i> visited = new HashSet<>();
 
@@ -69,11 +71,10 @@ public class Block {
 
         while (!queue.isEmpty()) {
             Vector2i offset = queue.poll();
-
             block1.posX += offset.getX();
             block1.posY += offset.getY();
 
-            if (!block1.intersects(block2) && block1.canAdsorb(block2)) {
+            if (!block1.intersects(block2) && block1.canAdsorb(block2) && predicate.test(new Vector2i(block1.posX, block1.posY))) {
                 return offset;
             }
 

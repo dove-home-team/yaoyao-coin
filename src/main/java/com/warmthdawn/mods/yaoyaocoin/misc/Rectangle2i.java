@@ -92,4 +92,13 @@ public class Rectangle2i {
         return this;
     }
 
+    public Rectangle2i expandInPlace(int amount) {
+        x0 -= amount;
+        y0 -= amount;
+        width += 2 * amount;
+        height += 2 * amount;
+        return this;
+    }
+
+
 }

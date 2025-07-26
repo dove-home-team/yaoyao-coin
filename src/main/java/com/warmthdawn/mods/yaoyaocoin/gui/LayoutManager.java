@@ -1,8 +1,8 @@
 package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.logging.LogUtils;
-import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinLayoutArea;
+import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
@@ -250,7 +250,7 @@ public class LayoutManager {
     }
 
     public void updateGroupPosition(AbstractContainerScreen<?> screen, CoinSlotGroup group, int x, int y,
-                                    boolean forceAdsorb) {
+                                    boolean forceAdsorb, boolean ignoreBorder) {
         int newX = x;
         int newY = y;
         // collisions to center rect
@@ -332,6 +332,11 @@ public class LayoutManager {
                                 valid = false;
                                 break;
                             }
+                        } else if (ignoreBorder) {
+                            if (collision.intersects(offsetCollision)) {
+                                valid = false;
+                                break;
+                            }
                         } else {
 
                             if (collision.intersects(offsetCollision, 2 * SLOT_BORDER_SIZE)) {
@@ -351,11 +356,14 @@ public class LayoutManager {
                 continue;
             }
 
-            if (nearestOffset == null || offset.lengthManhattan() < nearestOffset.lengthManhattan()) {
-                Vector2i pos = otherOffset
-                        .add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
+            Vector2i pos = otherOffset
+                    .add(new Vector2i(currentBlock.getX(), currentBlock.getY()).scaleInPlace(SLOT_SIZE));
 
-                nearestOffset = offset;
+            Vector2i oriOffset = pos.subtract(newPos);
+
+            if (nearestOffset == null || oriOffset.lengthManhattan() < nearestOffset.lengthManhattan()) {
+
+                nearestOffset = oriOffset;
                 finalNewPos = pos;
 
             }
@@ -488,7 +496,7 @@ public class LayoutManager {
         for (Tuple<CoinSlotGroup, CoinSlot> tuple : toShow) {
             CoinSlotGroup group = tuple.getA();
             group.setVisible(true);
-            updateGroupPosition(screen, group, group.getGroupX(), group.getGroupY(), false);
+            updateGroupPosition(screen, group, group.getGroupX(), group.getGroupY(), false, false);
         }
 
         if (!toShow.isEmpty() || !toHide.isEmpty()) {
@@ -537,7 +545,7 @@ public class LayoutManager {
 
     private void splitGroup(CoinSlotGroup group) {
         ArrayList<CoinSlotGroup> splitted = new ArrayList<>();
-        if(group.empty()) {
+        if (group.empty()) {
             return;
         }
         boolean doSplit = group.splitUnConnected(splitted);
@@ -805,7 +813,7 @@ public class LayoutManager {
         extra.endUpdate();
         groups.add(extra);
 
-        updateGroupPosition(screen, extra, extra.getGroupX(), extra.getGroupY(), false);
+        updateGroupPosition(screen, extra, extra.getGroupX(), extra.getGroupY(), false, false);
     }
 
     public CoinSlotGroup getGroup(int slotId) {

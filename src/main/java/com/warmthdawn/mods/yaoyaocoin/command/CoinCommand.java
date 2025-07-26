@@ -6,6 +6,7 @@ import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoin;
+import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoinSingle;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -101,7 +102,7 @@ public class CoinCommand {
                     for (int i = 0; i < coin.getSlots(); i++) {
                         coin.setVisibility(i, visible);
                     }
-                    sendCoinUpdatePacket(player);
+                    sendCoinUpdatePacket(player, null);
                 });
             }
         }
@@ -117,7 +118,7 @@ public class CoinCommand {
                         .getCapability(CoinCapability.COIN_INVENTORY).cast();
                 inv.ifPresent(coin -> {
                     coin.setVisibility(type.id(), visible);
-                    sendCoinUpdatePacket(player);
+                    sendCoinUpdatePacket(player, type);
                 });
             }
         }
@@ -135,7 +136,7 @@ public class CoinCommand {
                     int count = coin.getCoinCount(type.id());
                     count = Math.min(type.maxStackSize(), count + number);
                     coin.setCoinCount(type.id(), count);
-                    sendCoinUpdatePacket(player);
+                    sendCoinUpdatePacket(player, type);
                 });
             }
         }
@@ -143,8 +144,12 @@ public class CoinCommand {
         return targets.size();
     }
 
-    private static void sendCoinUpdatePacket(ServerPlayer player) {
-        YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), PacketSyncCoin.fromPlayer(player));
+    private static void sendCoinUpdatePacket(ServerPlayer player, CoinType type) {
+        if (type == null) {
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), PacketSyncCoin.fromPlayer(player));
+        } else {
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), PacketSyncCoinSingle.fromPlayer(player, type));
+        }
     }
 
     private static int consumeCoin(CommandSourceStack source, Collection<? extends Entity> targets, CoinType type,
@@ -157,7 +162,7 @@ public class CoinCommand {
                     int count = coin.getCoinCount(type.id());
                     count = Math.max(0, count - number);
                     coin.setCoinCount(type.id(), count);
-                    sendCoinUpdatePacket(player);
+                    sendCoinUpdatePacket(player, type);
                 });
             }
         }
@@ -172,7 +177,7 @@ public class CoinCommand {
                         .getCapability(CoinCapability.COIN_INVENTORY).cast();
                 inv.ifPresent(coin -> {
                     coin.clear();
-                    sendCoinUpdatePacket(player);
+                    sendCoinUpdatePacket(player, null);
                 });
             }
         }

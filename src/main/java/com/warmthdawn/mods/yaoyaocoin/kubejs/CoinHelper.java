@@ -4,7 +4,7 @@ import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
-import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoin;
+import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoinSingle;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import dev.latvian.mods.kubejs.typings.Info;
 import dev.latvian.mods.kubejs.typings.Param;
@@ -32,8 +32,12 @@ public class CoinHelper {
         if (this.player == null) {
             return ItemStack.EMPTY;
         }
+        CoinType type = CoinUtils.findType(stack);
+        if (type == null) {
+            return stack;
+        }
         ItemStack ret = CoinUtils.insertCoin(player, stack);
-        sendCoinUpdatePacket();
+        sendCoinUpdatePacket(type);
         return ret;
     }
 
@@ -54,9 +58,8 @@ public class CoinHelper {
             int count = coin.getCoinCount(type.id());
             count = Math.min(type.maxStackSize(), count + amount);
             coin.setCoinCount(type.id(), count);
-            sendCoinUpdatePacket();
+            sendCoinUpdatePacket(type);
         });
-        sendCoinUpdatePacket();
     }
 
     @Info(value = "Extract a coin from the player's inventory", params = {
@@ -68,8 +71,12 @@ public class CoinHelper {
         if (this.player == null) {
             return ItemStack.EMPTY;
         }
+        CoinType type = CoinUtils.findType(stack);
+        if (type == null) {
+            return ItemStack.EMPTY;
+        }
         ItemStack ret = CoinUtils.extractCoin(player, stack, amount, autoTransform);
-        sendCoinUpdatePacket();
+        sendCoinUpdatePacket(type);
         return ret;
     }
 
@@ -94,11 +101,11 @@ public class CoinHelper {
         if (this.player == null) {
             return ItemStack.EMPTY;
         }
-        if(type == null) {
+        if (type == null) {
             throw new IllegalArgumentException("Coin type cannot be null");
         }
         ItemStack ret = CoinUtils.extractCoin(player, type, amount, autoTransform);
-        sendCoinUpdatePacket();
+        sendCoinUpdatePacket(type);
         return ret;
     }
 
@@ -110,7 +117,7 @@ public class CoinHelper {
         if (this.player == null) {
             return;
         }
-        if(type == null) {
+        if (type == null) {
             throw new IllegalArgumentException("Coin type cannot be null");
         }
         LazyOptional<CoinInventoryCapability.CoinInventory> inv = player
@@ -118,7 +125,7 @@ public class CoinHelper {
 
         inv.ifPresent(coin -> {
             coin.setVisibility(type.id(), enable);
-            sendCoinUpdatePacket();
+            sendCoinUpdatePacket(type);
         });
     }
 
@@ -133,13 +140,13 @@ public class CoinHelper {
                 .getCapability(CoinCapability.COIN_INVENTORY).cast();
         inv.ifPresent(coin -> {
             coin.setCoinCount(type.id(), 0);
-            sendCoinUpdatePacket();
+            sendCoinUpdatePacket(type);
         });
     }
 
     @HideFromJS
-    private void sendCoinUpdatePacket() {
-        YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), PacketSyncCoin.fromPlayer(player));
+    private void sendCoinUpdatePacket(CoinType type) {
+        YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), PacketSyncCoinSingle.fromPlayer(player, type));
     }
 
 

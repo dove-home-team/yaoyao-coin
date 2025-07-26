@@ -1,6 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.misc;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
@@ -9,9 +9,9 @@ import com.warmthdawn.mods.yaoyaocoin.gui.ClientCoinStorage;
 import com.warmthdawn.mods.yaoyaocoin.gui.CoinSlot;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketCoinSlotClicked;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
-import net.minecraft.resources.ResourceLocation;
+import it.unimi.dsi.fastutil.ints.IntArraySet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -21,12 +21,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.items.ItemHandlerHelper;
-import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class CoinUtils {
+
 
     public enum ClickType {
         //        PickOne,
@@ -40,18 +41,44 @@ public class CoinUtils {
         StoreStack,
     }
 
-    private static final Lazy<Set<Item>> playerCoinSet = Lazy.of(() -> {
-        ImmutableSet.Builder<Item> builder = ImmutableSet.builder();
+    private static final Lazy<Map<Item, int[]>> playerCoinSet = Lazy.of(() -> {
+        HashMap<Item, IntSet> map = new HashMap<>();
 
         for (int i = 0; i < CoinManager.getInstance().getCoinTypeCount(); i++) {
             CoinType coinType = CoinManager.getInstance().getCoinType(i);
-            builder.add(coinType.itemStack().getItem());
+            map.computeIfAbsent(coinType.itemStack().getItem(), it -> new IntArraySet(10)).add(i);
+        }
+
+        ImmutableMap.Builder<Item, int[]> builder = ImmutableMap.builder();
+        for (Map.Entry<Item, IntSet> entry : map.entrySet()) {
+            builder.put(entry.getKey(), entry.getValue().toArray(new int[0]));
         }
         return builder.build();
     });
 
     public static boolean mayCoinItem(ItemStack stack) {
-        return playerCoinSet.get().contains(stack.getItem());
+        return playerCoinSet.get().containsKey(stack.getItem());
+    }
+
+
+    public static CoinType findType(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return null;
+        }
+        CoinManager manager = CoinManager.getInstance();
+        int[] possible = playerCoinSet.get().get(stack.getItem());
+        if (possible == null) {
+            return null;
+        }
+        for (int id : possible) {
+            CoinType type = manager.getCoinType(id);
+            if (type.matches(stack)) {
+                return type;
+            }
+        }
+
+        return null;
+
     }
 
     public static ItemStack insertCoin(Player player, ItemStack stack) {
@@ -90,7 +117,6 @@ public class CoinUtils {
     }
 
     public static ItemStack extractCoin(Player player, String coinName, int count, boolean autoTransform) {
-
 
 
         CoinManager manager = CoinManager.getInstance();

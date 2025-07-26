@@ -7,7 +7,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 public class YaoYaoCoinNetwork {
 
-    public static final String PROTOCOL_VERSION = "1";
+    public static final String PROTOCOL_VERSION = "2";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(YaoYaoCoin.MODID, "main"),
             () -> PROTOCOL_VERSION,
@@ -29,5 +29,10 @@ public class YaoYaoCoinNetwork {
                 .consumerMainThread(PacketCoinSlotClicked::handle)
                 .add();
 
+        INSTANCE.messageBuilder(PacketSyncCoinSingle.class, id++)
+                .encoder(PacketSyncCoinSingle::encoder)
+                .decoder(PacketSyncCoinSingle::decoder)
+                .consumerMainThread(PacketSyncCoinSingle::messageConsumer)
+                .add();
     }
 }

@@ -140,8 +140,7 @@ public class CoinGuiHandler {
                 event.setCanceled(true);
             } else if (hoveringGroup != null) {
                 // Prevent click-through on the background and border of the slot
-                boolean isShiftHolding = Screen.hasShiftDown();
-                if (!isShiftHolding || hoveringGroup.isSingle()) {
+                if (!Screen.hasControlDown() || hoveringGroup.isSingle()) {
                     draggingGroup = hoveringGroup;
                     draggingStartX = mouseX;
                     draggingStartY = mouseY;
@@ -289,7 +288,7 @@ public class CoinGuiHandler {
         int x0 = prevDraggingX;
         int y0 = prevDraggingY;
 
-        layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy), Screen.hasAltDown());
+        layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy), Screen.hasAltDown(), false);
     }
 
     public void onDrawForeground(ContainerScreenEvent.Render.Foreground event) {

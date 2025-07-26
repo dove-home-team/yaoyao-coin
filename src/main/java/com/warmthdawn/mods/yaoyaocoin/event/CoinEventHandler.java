@@ -3,8 +3,10 @@ package com.warmthdawn.mods.yaoyaocoin.event;
 import com.warmthdawn.mods.yaoyaocoin.YaoYaoCoin;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
+import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.misc.CoinUtils;
 import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoin;
+import com.warmthdawn.mods.yaoyaocoin.network.PacketSyncCoinSingle;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -45,13 +47,15 @@ public class CoinEventHandler {
             return;
         }
 
-        if(!CoinUtils.mayCoinItem(stack)) {
-            return;
-        }
-
         if (!(player instanceof ServerPlayer serverPlayer)) {
             return;
         }
+
+        CoinType type = CoinUtils.findType(stack);
+        if(type == null) {
+            return;
+        }
+
         Item item = stack.getItem();
         ItemStack copy = stack.copy();
         ItemStack remaining = CoinUtils.insertCoin(player, stack);
@@ -71,7 +75,7 @@ public class CoinEventHandler {
 
             event.setCanceled(true);
 
-            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoin.fromPlayer(serverPlayer));
+            YaoYaoCoinNetwork.INSTANCE.send(PacketDistributor.PLAYER.with(() -> serverPlayer), PacketSyncCoinSingle.fromPlayer(serverPlayer, type));
         }
 
 

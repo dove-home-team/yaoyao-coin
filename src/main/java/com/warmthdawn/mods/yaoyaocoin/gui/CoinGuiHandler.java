@@ -289,9 +289,7 @@ public class CoinGuiHandler {
         int x0 = prevDraggingX;
         int y0 = prevDraggingY;
 
-        boolean isShiftHolding = Screen.hasShiftDown();
-
-        layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy), isShiftHolding);
+        layoutManager.updateGroupPosition(screen, draggingGroup, x0 + (int) Math.round(dx), y0 + (int) Math.round(dy), Screen.hasAltDown());
     }
 
     public void onDrawForeground(ContainerScreenEvent.Render.Foreground event) {

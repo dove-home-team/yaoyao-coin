@@ -681,7 +681,7 @@ public class LayoutManager {
 
         updateGroupVisibility();
 
-        computeGroupOverlap(false, false);
+        computeGroupOverlap(false, true);
     }
 
     private void placeDefault(AbstractContainerScreen<?> screen, Rectangle2i screenRect, List<CoinSlot> slots) {

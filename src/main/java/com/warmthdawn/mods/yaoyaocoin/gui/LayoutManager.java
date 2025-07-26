@@ -676,9 +676,8 @@ public class LayoutManager {
                 // if has hidden then not needed
                 finishMovement(screen, false);
             }
-        } else {
-            rebuildGroupIndex();
         }
+        rebuildGroupIndex();
 
         updateGroupVisibility();
     }

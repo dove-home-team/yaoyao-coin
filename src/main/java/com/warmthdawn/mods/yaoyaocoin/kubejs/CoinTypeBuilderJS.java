@@ -46,7 +46,7 @@ public class CoinTypeBuilderJS {
 
     @Info("Set the coin default layout area")
     public CoinTypeBuilderJS defaultArea(LayoutArea area) {
-        if (area == null) {
+        if (area == null || area == LayoutArea.INVALID) {
             return this;
         }
         this.defaultLayoutArea = area;

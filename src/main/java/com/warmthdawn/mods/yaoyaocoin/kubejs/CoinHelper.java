@@ -46,7 +46,7 @@ public class CoinHelper {
             return;
         }
         if (type == null) {
-            return;
+            throw new IllegalArgumentException("Coin type cannot be null");
         }
         LazyOptional<CoinInventoryCapability.CoinInventory> inv = player
                 .getCapability(CoinCapability.COIN_INVENTORY).cast();
@@ -94,6 +94,9 @@ public class CoinHelper {
         if (this.player == null) {
             return ItemStack.EMPTY;
         }
+        if(type == null) {
+            throw new IllegalArgumentException("Coin type cannot be null");
+        }
         ItemStack ret = CoinUtils.extractCoin(player, type, amount, autoTransform);
         sendCoinUpdatePacket();
         return ret;
@@ -107,8 +110,16 @@ public class CoinHelper {
         if (this.player == null) {
             return;
         }
+        if(type == null) {
+            throw new IllegalArgumentException("Coin type cannot be null");
+        }
         LazyOptional<CoinInventoryCapability.CoinInventory> inv = player
                 .getCapability(CoinCapability.COIN_INVENTORY).cast();
+
+        inv.ifPresent(coin -> {
+            coin.setVisibility(type.id(), enable);
+            sendCoinUpdatePacket();
+        });
     }
 
     @Info(value = "Clear all coins of the player's inventory by coin type", params = {

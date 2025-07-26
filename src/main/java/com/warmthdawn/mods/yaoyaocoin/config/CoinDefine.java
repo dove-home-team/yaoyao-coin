@@ -25,6 +25,7 @@ public class CoinDefine {
         public boolean hideDefault;
         public String itemName;
         public String itemTag;
+        public LayoutArea defaultArea;
     }
 
 
@@ -85,7 +86,8 @@ public class CoinDefine {
                   "convertGroup": 0,
                   "maxStackSize": 500,
                   "itemName": "minecraft:tipped_arrow",
-                  "itemTag": "{Potion:\\"minecraft:strength\\"}"
+                  "itemTag": "{Potion:\\"minecraft:strength\\"}",
+                  "defaultArea": "BOTTOM_RIGHT",
                 }
               ]
             }

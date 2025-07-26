@@ -3,8 +3,6 @@ package com.warmthdawn.mods.yaoyaocoin.config;
 
 import com.google.gson.Gson;
 import com.mojang.logging.LogUtils;
-import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
-import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 
@@ -12,8 +10,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 
 public class CoinSaveState {
@@ -29,10 +25,6 @@ public class CoinSaveState {
 
     public void addGroup(Group saveGroup) {
         groups.add(saveGroup);
-    }
-
-    public enum LayoutArea {
-        TOP_LEFT, TOP_CENTER, TOP_RIGHT, CENTER_LEFT, CENTER_RIGHT, BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT, INVALID
     }
 
     public static class Group {
@@ -64,6 +56,7 @@ public class CoinSaveState {
     private transient boolean loaded = false;
 
     public void save() {
+
         logger.info("Saving Coin Screen Layout");
 
 
@@ -77,46 +70,6 @@ public class CoinSaveState {
 
     }
 
-
-    private void initDefault() {
-        Group group = new Group();
-        group.id = 0;
-        group.horizontal = -10;
-        group.vertical = 0;
-        group.area = LayoutArea.CENTER_LEFT;
-        groups.add(group);
-
-        CoinManager manager = CoinManager.getInstance();
-
-        HashMap<Integer, List<Slot>> groupSlots = new HashMap<>();
-        for (int i = 0; i < manager.getCoinTypeCount(); i++) {
-            CoinType type = manager.getCoinType(i);
-            Slot slot = new Slot();
-            slot.x = 0;
-            slot.y = 0;
-            slot.name = type.name();
-            slot.groupId = 0;
-            slots.add(slot);
-            groupSlots.computeIfAbsent(type.convertGroup(), it -> new ArrayList<>()).add(slot);
-        }
-
-        List<List<Slot>> groupList = new ArrayList<>(groupSlots.values());
-
-        groupList.sort(Comparator.comparingInt(List::size));
-
-        for (int i = 0; i < groupList.size(); i++) {
-            List<Slot> slotList = groupList.get(i);
-            // sort by money
-            slotList.sort(Comparator.comparingInt(slot -> manager.findCoinType(slot.name).money()));
-            for (int j = 0; j < slotList.size(); j++) {
-                Slot slot = slotList.get(j);
-                slot.x = i;
-                slot.y = j;
-            }
-        }
-
-
-    }
 
     public void clear() {
         groups.clear();
@@ -142,7 +95,6 @@ public class CoinSaveState {
 
         if (!saveStateFile.exists()) {
             logger.info("No Coin Screen Layout found");
-            initDefault();
             loaded = true;
             return;
         }

@@ -2,6 +2,7 @@ package com.warmthdawn.mods.yaoyaocoin.data;
 
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
+import com.warmthdawn.mods.yaoyaocoin.config.LayoutArea;
 import com.warmthdawn.mods.yaoyaocoin.event.CoinInitEvent;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
@@ -67,6 +68,9 @@ public class CoinManager {
 
     private boolean loadJsonDefine() {
         boolean firstInit = CoinDefine.instance().load();
+        if(CoinDefine.instance().getCoinTypes() == null) {
+            return firstInit;
+        }
 
         for (CoinDefine.CoinType coinType : CoinDefine.instance().getCoinTypes()) {
             // convert string to tag
@@ -90,7 +94,10 @@ public class CoinManager {
                     e.printStackTrace();
                 }
             }
-            coinTypes.add(new CoinType(nextId.getAndIncrement(), coinType.name, coinType.money, coinType.convertGroup, coinType.maxStackSize, coinType.hideDefault, stack));
+            if(coinType.defaultArea == null) {
+                coinType.defaultArea = LayoutArea.TOP_LEFT;
+            }
+            coinTypes.add(new CoinType(nextId.getAndIncrement(), coinType.name, coinType.money, coinType.convertGroup, coinType.maxStackSize, coinType.hideDefault, stack, coinType.defaultArea));
         }
 
         return firstInit;

@@ -93,7 +93,7 @@ public class CoinGuiHandler {
             resetDragging();
 
             if (event.getScreen() instanceof AbstractContainerScreen<?> screen) {
-                layoutManager.finishMovement(screen);
+                layoutManager.finishMovement(screen, true);
             }
         }
     }

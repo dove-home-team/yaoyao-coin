@@ -1,17 +1,19 @@
 package com.warmthdawn.mods.yaoyaocoin.kubejs;
 
+import com.warmthdawn.mods.yaoyaocoin.config.LayoutArea;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import dev.latvian.mods.kubejs.typings.Info;
 import dev.latvian.mods.rhino.util.HideFromJS;
 import net.minecraft.world.item.ItemStack;
 
 public class CoinTypeBuilderJS {
-    private String name;
+    private final String name;
     private int money = -1;
     private int convertGroup = -1;
     private int maxStackSize = -1;
     private boolean hideDefault = false;
-    private ItemStack itemStack;
+    private final ItemStack itemStack;
+    private LayoutArea defaultLayoutArea = LayoutArea.TOP_LEFT;
 
     public CoinTypeBuilderJS(String name, ItemStack itemStack) {
         this.name = name;
@@ -42,6 +44,15 @@ public class CoinTypeBuilderJS {
         return this;
     }
 
+    @Info("Set the coin default layout area")
+    public CoinTypeBuilderJS defaultArea(LayoutArea area) {
+        if (area == null) {
+            return this;
+        }
+        this.defaultLayoutArea = area;
+        return this;
+    }
+
     @HideFromJS
     public CoinType build(int id) {
         if (money < 0) {
@@ -54,7 +65,7 @@ public class CoinTypeBuilderJS {
             maxStackSize = itemStack.getMaxStackSize();
         }
 
-        return new CoinType(id, name, money, convertGroup, maxStackSize, hideDefault, itemStack);
+        return new CoinType(id, name, money, convertGroup, maxStackSize, hideDefault, itemStack, defaultLayoutArea);
     }
 
 }

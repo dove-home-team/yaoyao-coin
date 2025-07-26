@@ -1,5 +1,6 @@
 package com.warmthdawn.mods.yaoyaocoin.data;
 
+import com.warmthdawn.mods.yaoyaocoin.config.LayoutArea;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
@@ -19,7 +20,8 @@ public record CoinType(
         int convertGroup,
         int maxStackSize,
         boolean hiddenDefault,
-        ItemStack itemStack
+        ItemStack itemStack,
+        LayoutArea defaultArea
 ) {
 
     public boolean matches(ItemStack stack) {

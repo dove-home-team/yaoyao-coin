@@ -10,6 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 
@@ -48,14 +49,16 @@ public class CoinManager {
         List<IntFunction<CoinType>> builders = new LinkedList<>();
         AtomicBoolean cancel = new AtomicBoolean(false);
 
-        if(CoinEventDispatcher.initCoins(builders, cancel)) {
-            firstInit = false;
-            for (IntFunction<CoinType> builder : builders) {
-                CoinType type = builder.apply(nextId.getAndIncrement());
-                coinTypes.add(type);
+        if(ModList.get().isLoaded("kubejs")) {
+            if(CoinEventDispatcher.initCoins(builders, cancel)) {
+                firstInit = false;
+                for (IntFunction<CoinType> builder : builders) {
+                    CoinType type = builder.apply(nextId.getAndIncrement());
+                    coinTypes.add(type);
+                }
             }
-        }
 
+        }
 
         if (cancel.get()) {
             return;

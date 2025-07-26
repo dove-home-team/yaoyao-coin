@@ -62,9 +62,9 @@ public class CoinInventoryCapability {
 
             for (int i = 0; i < manager.getCoinTypeCount(); i++) {
                 CoinType type = manager.getCoinType(i);
-                sampleStacks.set(i, type.createItemStack());
+                sampleStacks.set(i, type.itemStack());
                 coinsCounts[i] = 0;
-                coinVisibility[i] = true;
+                coinVisibility[i] = !type.hiddenDefault();
             }
 
 
@@ -292,7 +292,6 @@ public class CoinInventoryCapability {
 
                 ItemStack sample = ItemStack.of(entry.getCompound("item"));
                 int count = entry.getInt("count");
-                boolean visibility = !entry.contains("visibility") || entry.getBoolean("visibility");
 
 
                 CoinType type = manager.findCoinType(key);
@@ -317,7 +316,11 @@ public class CoinInventoryCapability {
 
                 int slot = type.id();
                 coinsCounts[slot] = count;
-                coinVisibility[slot] = visibility;
+
+                if(entry.contains("visibility")) {
+                    boolean visibility = entry.getBoolean("visibility");
+                    coinVisibility[slot] = visibility;
+                }
             }
 
             ListTag invalidStacksTag = tag.getList("invalidStacks", 10);

@@ -19,6 +19,32 @@ group = mod_group_id
 
 repositories {
     mavenLocal()
+    maven {
+        url "https://maven.latvian.dev/releases"
+        content {
+            includeGroup "dev.latvian.mods"
+            includeGroup "dev.latvian.apps"
+        }
+    }
+
+    maven {
+        url 'https://jitpack.io'
+        content {
+            includeGroup "com.github.rtyley"
+        }
+    }
+    maven {
+        url = "https://maven.architectury.dev"
+        content {
+            includeGroup "dev.architectury"
+        }
+    }
+    maven {
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 base {
@@ -142,6 +168,12 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 
     implementation("org.jetbrains:annotations:24.0.0")
+    modCompileOnly("dev.latvian.mods:rhino-forge:2001.2.3-build.10")
+    modCompileOnly("dev.latvian.mods:kubejs-forge:2001.6.5-build.20")
+    modRuntimeOnly("dev.latvian.mods:rhino-forge:2001.2.3-build.10")
+    modRuntimeOnly("dev.latvian.mods:kubejs-forge:2001.6.5-build.20")
+    modRuntimeOnly("dev.architectury:architectury-forge:9.1.12")
+    modRuntimeOnly("maven.modrinth:probejs:6.0.0")
 }
 
 // Uncomment the lines below if you wish to configure mixin. The mixin file should be named modid.mixins.json.

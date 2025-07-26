@@ -1,22 +1,25 @@
 package com.warmthdawn.mods.yaoyaocoin.data;
 
-import com.google.common.collect.ImmutableList;
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
-import net.minecraft.advancements.critereon.ItemPredicate;
+import com.warmthdawn.mods.yaoyaocoin.event.CoinInitEvent;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
 
 public class CoinManager {
     private static final Logger logger = LogUtils.getLogger();
     private final List<CoinType> coinTypes = new ArrayList<>();
+    private final AtomicInteger nextId = new AtomicInteger(0);
 
 
     private final Map<Integer, int[]> coinsMap = new HashMap<>();
@@ -35,26 +38,66 @@ public class CoinManager {
         return coinsMap.getOrDefault(convertGroup, new int[0]);
     }
 
-    public void init() {
 
-        int id = 0;
+    private void loadDefine() {
 
-        CoinDefine.instance().load();
+        boolean firstInit = loadJsonDefine();
+
+        // load by kubejs
+
+        CoinInitEvent event = new CoinInitEvent();
+        MinecraftForge.EVENT_BUS.post(event);
+
+        for(IntFunction<CoinType> builder: event.getBuilders()) {
+            CoinType type = builder.apply(nextId.getAndIncrement());
+            coinTypes.add(type);
+        }
+        if (event.isHandled()) {
+            firstInit = false;
+        }
+
+
+        if (firstInit) {
+            logger.info("No coin define found, using default define");
+            CoinDefine.instance().outputDefault();
+            loadJsonDefine();
+        }
+
+    }
+
+    private boolean loadJsonDefine() {
+        boolean firstInit = CoinDefine.instance().load();
 
         for (CoinDefine.CoinType coinType : CoinDefine.instance().getCoinTypes()) {
             // convert string to tag
             CompoundTag tag = null;
 
+            Item item = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(coinType.itemName));
+            if (item == null) {
+                logger.error("Failed to find item for coin type {}", coinType.name);
+                continue;
+            }
+
+            ItemStack stack = new ItemStack(item);
+            stack.setCount(1);
+
             if (coinType.itemTag != null) {
                 try {
                     tag = TagParser.parseTag(coinType.itemTag);
+                    stack.setTag(tag);
                 } catch (Exception e) {
                     logger.error("Failed to parse item tag for coin type {}", coinType.name);
                     e.printStackTrace();
                 }
             }
-            coinTypes.add(new CoinType(id++, coinType.name, coinType.money, coinType.convertGroup, coinType.maxStackSize, new ResourceLocation(coinType.itemName), tag));
+            coinTypes.add(new CoinType(nextId.getAndIncrement(), coinType.name, coinType.money, coinType.convertGroup, coinType.maxStackSize, coinType.hideDefault, stack));
         }
+
+        return firstInit;
+    }
+
+    public void init() {
+        loadDefine();
 
         convertMap.clear();
         for (CoinType type : coinTypes) {

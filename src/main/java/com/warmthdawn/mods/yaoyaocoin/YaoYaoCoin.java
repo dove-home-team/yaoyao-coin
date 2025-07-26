@@ -54,8 +54,6 @@ public class YaoYaoCoin {
 
     private void setup(final FMLCommonSetupEvent event) {
         CoinManager.getInstance().init();
-
-
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> ClientCoinStorage.INSTANCE::init);
     }
 

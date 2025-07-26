@@ -27,7 +27,7 @@ public class ClientCoinStorage {
 
         for (int i = 0; i < manager.getCoinTypeCount(); i++) {
             CoinType type = manager.getCoinType(i);
-            ItemStack stack = type.createItemStack();
+            ItemStack stack = type.itemStack();
             slots.add(new CoinSlot(i, stack));
         }
 
@@ -149,18 +149,11 @@ public class ClientCoinStorage {
         return ItemStack.EMPTY;
     }
 
-    public ItemStack extractCoin(String name, int count, boolean transform) {
-        CoinManager manager = CoinManager.getInstance();
-        CoinType type = manager.findCoinType(name);
-        if (type != null) {
-            if (transform) {
-                return this.extractFromSlotTransforming(type.id(), count);
-            }
-            return this.extractFromSlot(type.id(), count);
+    public ItemStack extractCoin(CoinType type, int count, boolean transform) {
+        if (transform) {
+            return this.extractFromSlotTransforming(type.id(), count);
         }
-
-
-        return ItemStack.EMPTY;
+        return this.extractFromSlot(type.id(), count);
     }
 
 

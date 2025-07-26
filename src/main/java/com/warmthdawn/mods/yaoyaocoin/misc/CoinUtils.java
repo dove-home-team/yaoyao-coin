@@ -11,10 +11,12 @@ import com.warmthdawn.mods.yaoyaocoin.network.PacketCoinSlotClicked;
 import com.warmthdawn.mods.yaoyaocoin.network.YaoYaoCoinNetwork;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.common.util.Lazy;
 import net.minecraftforge.common.util.LazyOptional;
@@ -38,18 +40,18 @@ public class CoinUtils {
         StoreStack,
     }
 
-    private static final Lazy<Set<ResourceLocation>> playerCoinSet = Lazy.of(() -> {
-        ImmutableSet.Builder<ResourceLocation> builder = ImmutableSet.builder();
+    private static final Lazy<Set<Item>> playerCoinSet = Lazy.of(() -> {
+        ImmutableSet.Builder<Item> builder = ImmutableSet.builder();
 
         for (int i = 0; i < CoinManager.getInstance().getCoinTypeCount(); i++) {
             CoinType coinType = CoinManager.getInstance().getCoinType(i);
-            builder.add(coinType.itemName());
+            builder.add(coinType.itemStack().getItem());
         }
         return builder.build();
     });
 
     public static boolean mayCoinItem(ItemStack stack) {
-        return playerCoinSet.get().contains(ForgeRegistries.ITEMS.getKey(stack.getItem()));
+        return playerCoinSet.get().contains(stack.getItem());
     }
 
     public static ItemStack insertCoin(Player player, ItemStack stack) {
@@ -87,18 +89,22 @@ public class CoinUtils {
 
     }
 
-
     public static ItemStack extractCoin(Player player, String coinName, int count, boolean autoTransform) {
 
 
-        if (!(player instanceof ServerPlayer serverPlayer)) {
-            return ClientCoinStorage.INSTANCE.extractCoin(coinName, count, autoTransform);
-        }
 
         CoinManager manager = CoinManager.getInstance();
         CoinType type = manager.findCoinType(coinName);
         if (type == null) {
             return ItemStack.EMPTY;
+        }
+        return extractCoin(player, type, count, autoTransform);
+    }
+
+    public static ItemStack extractCoin(Player player, CoinType type, int count, boolean autoTransform) {
+
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return ClientCoinStorage.INSTANCE.extractCoin(type, count, autoTransform);
         }
         LazyOptional<CoinInventoryCapability.CoinInventory> inventory = player.getCapability(CoinCapability.COIN_INVENTORY).cast();
 

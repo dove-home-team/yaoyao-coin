@@ -12,7 +12,7 @@
     "MixinAbstractContainerMenu",
     "MixinInventory",
     "MixinMerchantMenu",
-    "MixinServerPlayer"
+    "MixinPlayer"
   ],
   "injectors": {
     "defaultRequire": 1

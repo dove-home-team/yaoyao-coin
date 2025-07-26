@@ -2,7 +2,7 @@ package com.warmthdawn.mods.yaoyaocoin.gui;
 
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinSaveState;
-import com.warmthdawn.mods.yaoyaocoin.config.LayoutArea;
+import com.warmthdawn.mods.yaoyaocoin.config.CoinLayoutArea;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.misc.Block;
@@ -152,13 +152,13 @@ public class LayoutManager {
             }
 
             if (dockTop && dockLeft) {
-                saveGroup.area = LayoutArea.TOP_LEFT;
+                saveGroup.area = CoinLayoutArea.TOP_LEFT;
             } else if (dockTop) {
-                saveGroup.area = LayoutArea.TOP_RIGHT;
+                saveGroup.area = CoinLayoutArea.TOP_RIGHT;
             } else if (dockLeft) {
-                saveGroup.area = LayoutArea.BOTTOM_LEFT;
+                saveGroup.area = CoinLayoutArea.BOTTOM_LEFT;
             } else {
-                saveGroup.area = LayoutArea.BOTTOM_RIGHT;
+                saveGroup.area = CoinLayoutArea.BOTTOM_RIGHT;
             }
 
             saveState.addGroup(saveGroup);
@@ -629,7 +629,7 @@ public class LayoutManager {
             }
 
             // move out
-            if (group.area == LayoutArea.INVALID) {
+            if (group.area == CoinLayoutArea.INVALID) {
                 Vector2i pos = new Vector2i(slotGroup.getGroupX(), slotGroup.getGroupY());
                 if (collisionWithScreen(screenRect, slotGroup, pos, 0)) {
                     slotGroup.setGroupX(pos.getX());
@@ -680,24 +680,26 @@ public class LayoutManager {
         rebuildGroupIndex();
 
         updateGroupVisibility();
+
+        computeGroupOverlap(false, false);
     }
 
     private void placeDefault(AbstractContainerScreen<?> screen, Rectangle2i screenRect, List<CoinSlot> slots) {
         // group slots by layout area
         CoinManager manager = CoinManager.getInstance();
-        HashMap<LayoutArea, List<CoinSlot>> groupSlots = new HashMap<>();
+        HashMap<CoinLayoutArea, List<CoinSlot>> groupSlots = new HashMap<>();
         for (CoinSlot slot : slots) {
             CoinType type = manager.getCoinType(slot.getId());
             groupSlots.computeIfAbsent(type.defaultArea(), it -> new ArrayList<>()).add(slot);
         }
 
-        for (LayoutArea area : groupSlots.keySet()) {
+        for (CoinLayoutArea area : groupSlots.keySet()) {
             placeDefault(screen, screenRect, groupSlots.get(area), area);
         }
 
     }
 
-    private Vector2i computeAreaPosition(Rectangle2i screenRect, LayoutArea area, int width, int height) {
+    private Vector2i computeAreaPosition(Rectangle2i screenRect, CoinLayoutArea area, int width, int height) {
         Vector2i pos = new Vector2i(10, 10);
         // horizontal
         switch (area) {
@@ -741,7 +743,7 @@ public class LayoutManager {
     }
 
     private void placeDefault(AbstractContainerScreen<?> screen, Rectangle2i screenRect, List<CoinSlot> slots,
-                              LayoutArea area) {
+                              CoinLayoutArea area) {
         CoinSlotGroup extra = new CoinSlotGroup();
         CoinManager manager = CoinManager.getInstance();
 
@@ -757,9 +759,9 @@ public class LayoutManager {
         int xCount = groupList.size();
         int yCount = groupList.stream().map(List::size).max(Comparator.naturalOrder()).orElse(1);
 
-        boolean xInvert = (area == LayoutArea.TOP_RIGHT || area == LayoutArea.BOTTOM_RIGHT || area == LayoutArea.CENTER_RIGHT);
-        boolean yInvert = (area == LayoutArea.BOTTOM_LEFT || area == LayoutArea.BOTTOM_RIGHT || area == LayoutArea.BOTTOM_CENTER);
-        boolean xyInv = (area == LayoutArea.BOTTOM_CENTER || area == LayoutArea.TOP_CENTER);
+        boolean xInvert = (area == CoinLayoutArea.TOP_RIGHT || area == CoinLayoutArea.BOTTOM_RIGHT || area == CoinLayoutArea.CENTER_RIGHT);
+        boolean yInvert = (area == CoinLayoutArea.BOTTOM_LEFT || area == CoinLayoutArea.BOTTOM_RIGHT || area == CoinLayoutArea.BOTTOM_CENTER);
+        boolean xyInv = (area == CoinLayoutArea.BOTTOM_CENTER || area == CoinLayoutArea.TOP_CENTER);
 
         if (xyInv) {
             // exchange xy

@@ -25,7 +25,7 @@ public class CoinDefine {
         public boolean hideDefault;
         public String itemName;
         public String itemTag;
-        public LayoutArea defaultArea;
+        public CoinLayoutArea defaultArea;
     }
 
 

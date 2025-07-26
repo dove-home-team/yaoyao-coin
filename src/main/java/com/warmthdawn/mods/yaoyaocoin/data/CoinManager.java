@@ -2,14 +2,13 @@ package com.warmthdawn.mods.yaoyaocoin.data;
 
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
-import com.warmthdawn.mods.yaoyaocoin.config.LayoutArea;
+import com.warmthdawn.mods.yaoyaocoin.config.CoinLayoutArea;
 import com.warmthdawn.mods.yaoyaocoin.kubejs.CoinEventDispatcher;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
@@ -105,7 +104,7 @@ public class CoinManager {
                 }
             }
             if (coinType.defaultArea == null) {
-                coinType.defaultArea = LayoutArea.TOP_LEFT;
+                coinType.defaultArea = CoinLayoutArea.TOP_LEFT;
             }
             coinTypes.add(new CoinType(nextId.getAndIncrement(), coinType.name, coinType.money, coinType.convertGroup, coinType.maxStackSize, coinType.hideDefault, stack, coinType.defaultArea));
         }

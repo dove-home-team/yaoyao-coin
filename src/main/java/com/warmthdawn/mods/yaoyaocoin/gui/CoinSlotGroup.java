@@ -363,6 +363,10 @@ public class CoinSlotGroup {
         if (index < 0) {
             return;
         }
+        if(other.slots.size() <= index) {
+            logger.error("Trying to take slot from empty slot group! this is a bug!");
+            return;
+        }
         Entry entry = other.slots.get(index);
         this.slots.add(entry);
 

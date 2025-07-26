@@ -31,7 +31,7 @@ public class CoinSaveState {
         public int id;
         public int horizontal;
         public int vertical;
-        public LayoutArea area;
+        public CoinLayoutArea area;
         public boolean visible = true;
     }
 

@@ -491,7 +491,7 @@ public class LayoutManager {
             updateGroupPosition(screen, group, group.getGroupX(), group.getGroupY(), false);
         }
 
-        if (toShow.isEmpty() && toHide.isEmpty()) {
+        if (!toShow.isEmpty() || !toHide.isEmpty()) {
             computeGroupOverlap(false, false);
             rebuildGroupIndex();
             finishMovement(screen, false);
@@ -537,6 +537,9 @@ public class LayoutManager {
 
     private void splitGroup(CoinSlotGroup group) {
         ArrayList<CoinSlotGroup> splitted = new ArrayList<>();
+        if(group.empty()) {
+            return;
+        }
         boolean doSplit = group.splitUnConnected(splitted);
 
         if (!doSplit) {

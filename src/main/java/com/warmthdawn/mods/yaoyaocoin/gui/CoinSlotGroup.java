@@ -22,7 +22,7 @@ public class CoinSlotGroup {
     }
 
     public boolean empty() {
-        return slots.isEmpty();
+        return slots.stream().allMatch(Entry::isBorrowed);
     }
 
     public int slotCount() {

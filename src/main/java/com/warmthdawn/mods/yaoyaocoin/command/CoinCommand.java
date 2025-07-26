@@ -30,6 +30,11 @@ public class CoinCommand {
                                                     var players = EntityArgument.getPlayers(ctx, "players");
                                                     CoinType type = CoinNameArgument.getCoin(ctx, "slot_name");
                                                     return setSlotVisibility(ctx.getSource(), players, type, true);
+                                                }))
+                                        .then(Commands.literal("all")
+                                                .executes(ctx -> {
+                                                    var players = EntityArgument.getPlayers(ctx, "players");
+                                                    return setAllSlotVisibility(ctx.getSource(), players, true);
                                                 }))))
                         // disable
                         .then(Commands.literal("disable")
@@ -39,6 +44,11 @@ public class CoinCommand {
                                                     var players = EntityArgument.getPlayers(ctx, "players");
                                                     CoinType type = CoinNameArgument.getCoin(ctx, "slot_name");
                                                     return setSlotVisibility(ctx.getSource(), players, type, false);
+                                                }))
+                                        .then(Commands.literal("all")
+                                                .executes(ctx -> {
+                                                    var players = EntityArgument.getPlayers(ctx, "players");
+                                                    return setAllSlotVisibility(ctx.getSource(), players, false);
                                                 }))))
                         // give
                         .then(Commands.literal("give")
@@ -80,6 +90,23 @@ public class CoinCommand {
                                             return clearCoin(ctx.getSource(), players);
                                         })))
         );
+    }
+
+    private static int setAllSlotVisibility(CommandSourceStack source, Collection<? extends Entity> targets, boolean visible) {
+        for (Entity target : targets) {
+            if (target instanceof ServerPlayer player) {
+                LazyOptional<CoinInventoryCapability.CoinInventory> inv = player
+                        .getCapability(CoinCapability.COIN_INVENTORY).cast();
+                inv.ifPresent(coin -> {
+                    for (int i = 0; i < coin.getSlots(); i++) {
+                        coin.setVisibility(i, visible);
+                    }
+                    sendCoinUpdatePacket(player);
+                });
+            }
+        }
+
+        return targets.size();
     }
 
     private static int setSlotVisibility(CommandSourceStack source, Collection<? extends Entity> targets, CoinType type,

@@ -263,10 +263,12 @@ public class CoinUtils {
                 if (j <= maxSize) {
                     count = 0;
                     itemstack.setCount(j);
+                    slot.set(itemstack);
                     slot.setChanged();
                 } else if (itemstack.getCount() < maxSize) {
                     count -= maxSize - itemstack.getCount();
                     itemstack.setCount(maxSize);
+                    slot.set(itemstack);
                     slot.setChanged();
                 }
             }

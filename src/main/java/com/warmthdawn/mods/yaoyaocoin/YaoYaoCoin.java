@@ -46,8 +46,11 @@ public class YaoYaoCoin {
 
         ARGUMENT_TYPES.register(FMLJavaModLoadingContext.get().getModEventBus());
         MinecraftForge.EVENT_BUS.register(this);
-        CoinGuiHandler guiHandler = new CoinGuiHandler();
-        guiHandler.initialize(MinecraftForge.EVENT_BUS);
+
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
+            CoinGuiHandler guiHandler = new CoinGuiHandler();
+            guiHandler.initialize(MinecraftForge.EVENT_BUS);
+        });
 
         YaoYaoCoinNetwork.init();
     }

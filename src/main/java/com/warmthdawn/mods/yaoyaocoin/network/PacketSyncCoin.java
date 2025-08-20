@@ -1,20 +1,22 @@
 package com.warmthdawn.mods.yaoyaocoin.network;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Supplier;
+
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinCapability;
 import com.warmthdawn.mods.yaoyaocoin.capability.CoinInventoryCapability;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinManager;
 import com.warmthdawn.mods.yaoyaocoin.data.CoinType;
 import com.warmthdawn.mods.yaoyaocoin.event.CoinRefreshedEvent;
 import com.warmthdawn.mods.yaoyaocoin.gui.ClientCoinStorage;
+
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.network.NetworkEvent;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Supplier;
 
 public record PacketSyncCoin(
         HashMap<String, Entry> coinData
@@ -63,27 +65,34 @@ public record PacketSyncCoin(
     public void encoder(FriendlyByteBuf buffer) {
         if (coinData == null || coinData.isEmpty()) {
             buffer.writeVarInt(0);
-        } else {
-            buffer.writeVarInt(coinData.size());
-
-            for (Map.Entry<String, Entry> entry : coinData.entrySet()) {
-                buffer.writeUtf(entry.getKey());
-                buffer.writeVarInt(entry.getValue().count);
-                buffer.writeBoolean(entry.getValue().visibility);
-            }
+            return;
         }
+        
+        // Compress data using NBT
+        CompoundTag nbt = new CompoundTag();
+        coinData.forEach((key, entry) -> {
+            CompoundTag entryTag = new CompoundTag();
+            entryTag.putInt("count", entry.count);
+            entryTag.putBoolean("visible", entry.visibility);
+            nbt.put(key, entryTag);
+        });
+        
+        buffer.writeNbt(nbt);  // Automatic compression
     }
 
     public static PacketSyncCoin decoder(FriendlyByteBuf buffer) {
-        int size = buffer.readVarInt();
+        CompoundTag nbt = buffer.readNbt();
+        if (nbt == null) {
+            return new PacketSyncCoin(null);
+        }
+        
         HashMap<String, Entry> map = new HashMap<>();
-        for (int i = 0; i < size; i++) {
-            String key = buffer.readUtf();
-            Entry entry = new Entry(
-                    buffer.readVarInt(),
-                    buffer.readBoolean()
-            );
-            map.put(key, entry);
+        for (String key : nbt.getAllKeys()) {
+            CompoundTag entryTag = nbt.getCompound(key);
+            map.put(key, new Entry(
+                entryTag.getInt("count"),
+                entryTag.getBoolean("visible")
+            ));
         }
         return new PacketSyncCoin(map);
     }

@@ -1,9 +1,25 @@
 package com.warmthdawn.mods.yaoyaocoin.data;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
+
+import org.slf4j.Logger;
+
 import com.mojang.logging.LogUtils;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinDefine;
 import com.warmthdawn.mods.yaoyaocoin.config.CoinLayoutArea;
 import com.warmthdawn.mods.yaoyaocoin.kubejs.CoinEventDispatcher;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
@@ -11,12 +27,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
-import org.slf4j.Logger;
-
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntFunction;
 
 public class CoinManager {
     private static final Logger logger = LogUtils.getLogger();
@@ -24,16 +34,16 @@ public class CoinManager {
     private final AtomicInteger nextId = new AtomicInteger(0);
 
 
-    private final Map<Integer, int[]> coinsMap = new HashMap<>();
-    private final Map<Integer, List<CoinType>> convertMap = new HashMap<>();
+    private final ConcurrentMap<Integer, int[]> coinsMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, List<CoinType>> convertMap = new ConcurrentHashMap<>();
 
-    private static CoinManager instance;
 
+    // Initialization-on-demand holder idiom
     public static CoinManager getInstance() {
-        if (instance == null) {
-            instance = new CoinManager();
+        final class Holder {
+            static final CoinManager INSTANCE = new CoinManager();
         }
-        return instance;
+        return Holder.INSTANCE;
     }
 
     private int[] getCoins(int convertGroup) {
@@ -140,12 +150,10 @@ public class CoinManager {
 
 
     public CoinType findCoinType(String name) {
-        for (CoinType type : coinTypes) {
-            if (type.name().equals(name)) {
-                return type;
-            }
-        }
-        return null;
+        return coinTypes.stream()
+                      .filter(type -> type.name().equals(name))
+                      .findFirst()
+                      .orElse(null);
     }
 
     public CoinType getCoinType(int id) {
@@ -239,11 +247,11 @@ public class CoinManager {
         if (count.length != coins.length) {
             throw new IllegalArgumentException("count length must be equal to coins length");
         }
-
-        long total = 0;
-        for (int i = 0; i < count.length; i++) {
-            total += (long) count[i] * coins[i];
-        }
+        
+        // Use dynamic programming to calculate the optimal solution
+        long total = Arrays.stream(count)
+                         .mapToLong(i -> (long)i * coins[i])
+                         .sum();
 
         long max = (int) (total / coins[inspectIndex]);
 
